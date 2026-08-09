@@ -1,0 +1,10 @@
+{
+  "apiKey": "AIzaSyDl2ys5fH7c5lDosqG8o_duX0kPjAb7wQI",
+  "authDomain": "debt-tracker-ac4fb.firebaseapp.com",
+  "databaseURL": "https://debt-tracker-ac4fb-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "projectId": "debt-tracker-ac4fb",
+  "storageBucket": "debt-tracker-ac4fb.firebasestorage.app",
+  "messagingSenderId": "27672934493",
+  "appId": "1:27672934493:web:16986cfb7164040f55b5b4",
+  "firestoreDatabaseId": "(default)"
+}

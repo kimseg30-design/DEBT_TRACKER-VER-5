@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions for Strict Security
+    // ===============================================================
+
+    // 1. Check if the user is authenticated and their email is verified
+    function isAuthenticated() {
+      return request.auth != null && 
+             (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider != 'password');
+    }
+
+    // 2. Check if the existing document belongs to the requesting user
+    function isDocOwner() {
+      return isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // 3. Check if the new document being created is assigned to the current user
+    function isCreatingOwnDoc() {
+      return isAuthenticated() && 
+             request.resource.data.keys().hasAll(['uid']) && 
+             request.resource.data.uid == request.auth.uid;
+    }
+
+    // 4. Ensure the 'uid' field is NEVER modified during an update
+    function uidNotModified() {
+      return request.resource.data.uid == resource.data.uid;
+    }
+
+    // ===============================================================
+    // Global Default Deny
+    // ===============================================================
+    
+    // Reject all requests by default unless explicitly allowed below
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Collection-Specific Rules
+    // ===============================================================
+
+    match /loans/{loanId} {
+      allow read: if isDocOwner();
+      allow create: if isCreatingOwnDoc();
+      allow update: if isDocOwner() && isCreatingOwnDoc() && uidNotModified();
+      allow delete: if isDocOwner();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isDocOwner();
+      allow create: if isCreatingOwnDoc();
+      allow update: if isDocOwner() && isCreatingOwnDoc() && uidNotModified();
+      allow delete: if isDocOwner();
+    }
+
+    match /members/{memberId} {
+      allow read: if isDocOwner();
+      allow create: if isCreatingOwnDoc();
+      allow update: if isDocOwner() && isCreatingOwnDoc() && uidNotModified();
+      allow delete: if isDocOwner();
+    }
+
+    match /contributions/{contributionId} {
+      allow read: if isDocOwner();
+      allow create: if isCreatingOwnDoc();
+      allow update: if isDocOwner() && isCreatingOwnDoc() && uidNotModified();
+      allow delete: if isDocOwner();
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isDocOwner();
+      allow create: if isCreatingOwnDoc();
+      // Audit logs typically shouldn't be updated, but if needed, enforce strict ownership
+      allow update: if isDocOwner() && isCreatingOwnDoc() && uidNotModified();
+      allow delete: if isDocOwner();
+    }
+  }
+}

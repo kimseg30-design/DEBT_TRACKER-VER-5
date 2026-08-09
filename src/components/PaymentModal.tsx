@@ -1,0 +1,316 @@
+import React, { useState, useRef } from 'react';
+import { useStorage } from '../lib/storage';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter 
+} from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { toast } from 'sonner';
+import { Camera, Upload, X, CheckCircle, Trash2 } from 'lucide-react';
+import { getLoanStatus, calculateCurrentDeclaredDetails, getRemainingBalance } from '../lib/calculations';
+import { getPhilippineYMD, getPhilippineMidnightDate, formatPHTDate } from '../lib/phtDate';
+import { ConfirmDialog } from './ConfirmDialog';
+
+interface PaymentModalProps {
+  loanId: string;
+  onClose: () => void;
+}
+
+export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
+  const { loans, payments, addPayment, updateLoan, deletePayment } = useStorage();
+  const loan = loans.find(l => l.id === loanId);
+  const loanPayments = payments.filter(p => p.loanId === loanId);
+  
+  const [amount, setAmount] = useState(loan?.installmentAmount.toString() || '');
+  const [date, setDate] = useState(getPhilippineYMD());
+  const [notes, setNotes] = useState('');
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
+  const [isEarlySettlementSelected, setIsEarlySettlementSelected] = useState(loan?.isEarlySettlement || false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (!loan) return null;
+
+  // Dynamic calculations as of the selected payment date
+  const selectedDate = getPhilippineMidnightDate(date);
+  
+  const { elapsedMonths, declaredInterest, declaredTotalAmount } = calculateCurrentDeclaredDetails(
+    loan, 
+    loanPayments, 
+    selectedDate, 
+    isEarlySettlementSelected
+  );
+
+  const currentBalance = getRemainingBalance(
+    loan, 
+    loanPayments, 
+    selectedDate, 
+    isEarlySettlementSelected
+  );
+
+  const handleAutoFillRemainingBalance = () => {
+    setAmount(currentBalance.toString());
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+
+    try {
+      const paymentData = {
+        loanId,
+        amount: parseFloat(amount),
+        date: new Date(date).toISOString(),
+        notes,
+        ...(photo ? { photoUrl: photo } : {}),
+        isVerified: true,
+      };
+
+      await addPayment(paymentData);
+      
+      // Update loan status
+      const updatedPayments = [...loanPayments, { ...paymentData, id: 'temp', createdAt: new Date().toISOString() }];
+      const newStatus = getLoanStatus(loan, updatedPayments, selectedDate, isEarlySettlementSelected);
+      await updateLoan(loanId, { 
+        status: newStatus,
+        isEarlySettlement: !!(isEarlySettlementSelected || loan.isEarlySettlement)
+      });
+
+      toast.success('Payment recorded successfully');
+      onClose();
+    } catch (error) {
+      toast.error('Failed to record payment');
+      console.error(error);
+    }
+  };
+
+  const handleDeletePayment = async () => {
+    if (paymentToDelete) {
+      await deletePayment(paymentToDelete);
+      const updatedPayments = loanPayments.filter(p => p.id !== paymentToDelete);
+      const newStatus = getLoanStatus(loan, updatedPayments);
+      const stillFullyPaid = newStatus === 'Fully Paid';
+      await updateLoan(loanId, { 
+        status: newStatus,
+        isEarlySettlement: stillFullyPaid ? !!loan.isEarlySettlement : false
+      });
+      toast.success('Payment deleted');
+      setPaymentToDelete(null);
+    }
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="bg-card border-primary/10 text-white max-w-2xl max-h-[90vh] overflow-auto shadow-[0_0_30px_rgba(var(--primary),0.1)]">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold neon-text">Payments for {loan.borrowerName}</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid md:grid-cols-2 gap-8 py-4">
+          <div className="space-y-6">
+            <h3 className="text-sm font-medium text-zinc-300 uppercase tracking-wider">Record New Payment</h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="amount" className="text-zinc-300">Amount (₱)</Label>
+                <Input 
+                  id="amount" 
+                  type="number" 
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="bg-background border-primary/10 text-white focus:border-primary/50"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="date" className="text-zinc-300">Payment Date</Label>
+                <Input 
+                  id="date" 
+                  type="date" 
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="bg-background border-primary/10 text-white focus:border-primary/50"
+                />
+              </div>
+
+              {/* Early Settlement Option */}
+              <div className="flex items-center space-x-2 py-1 bg-background/40 border border-primary/10 rounded-lg p-3">
+                <input 
+                  id="earlySettlement" 
+                  type="checkbox" 
+                  checked={isEarlySettlementSelected}
+                  onChange={(e) => setIsEarlySettlementSelected(e.target.checked)}
+                  className="rounded border-primary/20 bg-background text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                />
+                <Label htmlFor="earlySettlement" className="text-sm text-zinc-300 cursor-pointer select-none">
+                  Enable Early Settlement (1 Month Interest)
+                </Label>
+              </div>
+
+              {/* Dynamic Interest/Balance Info Box */}
+              <div className="p-4 bg-background/60 border border-primary/20 rounded-xl space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary">Loan Balance (As of Selected Date)</h4>
+                <div className="grid grid-cols-2 gap-2 text-xs text-zinc-300">
+                  <div>Elapsed Time:</div>
+                  <div className="text-white text-right font-medium">
+                    {isEarlySettlementSelected ? '1 Month (Early Settlement)' : `${elapsedMonths} ${elapsedMonths === 1 ? 'Month' : 'Months'}`}
+                  </div>
+                  <div>Accrued Interest:</div>
+                  <div className="text-amber-400 text-right font-bold">
+                    ₱{declaredInterest.toLocaleString()}
+                  </div>
+                  <div>Total Declared Amount:</div>
+                  <div className="text-white text-right font-medium">
+                    ₱{declaredTotalAmount.toLocaleString()}
+                  </div>
+                  <div className="border-t border-zinc-800 col-span-2 my-1"></div>
+                  <div className="font-semibold text-primary">Remaining Balance:</div>
+                  <div className="text-primary text-right font-extrabold text-sm neon-text">
+                    ₱{currentBalance.toLocaleString()}
+                  </div>
+                </div>
+                
+                {currentBalance > 0 && (
+                  <div className="pt-2 flex justify-end">
+                    <Button 
+                      type="button" 
+                      variant="link" 
+                      className="p-0 h-auto text-[10px] text-primary hover:text-primary/80 font-semibold"
+                      onClick={handleAutoFillRemainingBalance}
+                    >
+                      Use Remaining Balance
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes" className="text-zinc-300">Notes (Optional)</Label>
+                <Textarea 
+                  id="notes" 
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="bg-background border-primary/10 text-white min-h-[80px] focus:border-primary/50"
+                  placeholder="Payment details..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Proof of Payment</Label>
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1 bg-background border-primary/10 text-zinc-300 hover:text-primary hover:border-primary/50"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload
+                  </Button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleFileChange} 
+                  />
+                </div>
+                {photo && (
+                  <div className="relative mt-2 rounded-lg overflow-hidden border border-zinc-800">
+                    <img src={photo} alt="Payment proof" className="w-full h-32 object-cover" />
+                    <Button 
+                      type="button" 
+                      variant="destructive" 
+                      size="icon" 
+                      className="absolute top-1 right-1 h-6 w-6 rounded-full"
+                      onClick={() => setPhoto(null)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/80 text-primary-foreground h-12 shadow-[0_0_15px_rgba(var(--primary),0.3)]">
+                Record Payment
+              </Button>
+            </form>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-sm font-medium text-zinc-300 uppercase tracking-wider">Payment History</h3>
+            <div className="space-y-3 max-h-[400px] overflow-auto pr-2">
+              {loanPayments.length > 0 ? (
+                loanPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((p) => (
+                  <div key={p.id} className="p-4 bg-background/50 border border-primary/10 rounded-xl space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-lg font-bold text-white">₱{p.amount.toLocaleString()}</p>
+                        <p className="text-xs text-zinc-400">{formatPHTDate(p.date)}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {p.isVerified && <CheckCircle className="h-4 w-4 text-accent" />}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-zinc-400 hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setPaymentToDelete(p.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    {p.notes && <p className="text-xs text-zinc-300 italic">"{p.notes}"</p>}
+                    {p.photoUrl && (
+                      <div className="pt-2">
+                        <img 
+                          src={p.photoUrl} 
+                          alt="Proof" 
+                          className="w-full h-20 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => window.open(p.photoUrl, '_blank')}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10 text-zinc-500">
+                  <p>No payments recorded yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+      
+      <ConfirmDialog
+        open={!!paymentToDelete}
+        onOpenChange={(open) => !open && setPaymentToDelete(null)}
+        title="Delete Payment"
+        description="Are you sure you want to delete this payment record? This will update the loan's remaining balance and progress. This action cannot be undone."
+        onConfirm={handleDeletePayment}
+        confirmText="Delete Payment"
+      />
+    </Dialog>
+  );
+}

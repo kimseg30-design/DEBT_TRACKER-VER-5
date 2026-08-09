@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "Loan": {
+      "title": "Loan",
+      "description": "Represents a loan record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "borrowerName": { "type": "string" },
+        "principal": { "type": "number" },
+        "interestRate": { "type": "number" },
+        "frequency": { "type": "string", "enum": ["Weekly", "Biweekly", "Monthly"] },
+        "installments": { "type": "number" },
+        "loanType": { "type": "string", "enum": ["New", "Reloan"] },
+        "loanGroup": { "type": "string", "enum": ["1st", "2nd"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "latePenalty": {
+          "type": "object",
+          "properties": {
+            "rate": { "type": "number" },
+            "gracePeriod": { "type": "number" }
+          }
+        },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["Unpaid", "Partial", "Fully Paid"] },
+        "totalAmount": { "type": "number" },
+        "totalInterest": { "type": "number" },
+        "installmentAmount": { "type": "number" },
+        "uid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "borrowerName", "principal", "interestRate", "frequency", "installments", "status", "uid"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Represents a payment record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "loanId": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "photoUrl": { "type": "string" },
+        "notes": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "uid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "loanId", "amount", "date", "uid"]
+    }
+  },
+  "firestore": {
+    "/loans/{loanId}": {
+      "schema": "Loan",
+      "description": "Collection of loans"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Collection of payments"
+    }
+  }
+}
