@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStorage } from '../lib/storage';
 import { getPhilippineYMD, formatPHTDate } from '../lib/phtDate';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -6,18 +6,26 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
-import { Users, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Users, Plus, Trash2, Edit2, Wallet } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner';
 
 export default function Members() {
-  const { members, addMember, updateMember, deleteMember } = useStorage();
+  const { members, contributions, addMember, updateMember, deleteMember } = useStorage();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
   const [baseContribution, setBaseContribution] = useState('50');
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const memberTotalContributions = useMemo(() => {
+    const map: Record<string, number> = {};
+    contributions.forEach(c => {
+      map[c.memberId] = (map[c.memberId] || 0) + (c.amount || 0);
+    });
+    return map;
+  }, [contributions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,6 +178,11 @@ export default function Members() {
                     <p className="text-sm text-zinc-400 mt-1">{member.contact || 'No contact info'}</p>
                     <p className="text-sm text-amber-400 font-medium mt-1">
                       Base Contribution: ₱{member.baseContribution !== undefined ? member.baseContribution.toLocaleString() : '50'}
+                    </p>
+                    <p className="text-sm text-emerald-400 font-bold mt-1 flex items-center gap-1.5">
+                      <Wallet className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Total Contributions:</span>
+                      <span>₱{(memberTotalContributions[member.id] || 0).toLocaleString()}</span>
                     </p>
                     <p className="text-xs text-zinc-500 mt-2">Joined: {formatPHTDate(member.joinDate)}</p>
                   </div>
