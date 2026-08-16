@@ -8,10 +8,22 @@ export interface LatePenalty {
   gracePeriod: number; // days
 }
 
+export interface BalanceDeclaration {
+  id: string;
+  previousPrincipal: number;
+  previousTotalPaid: number;
+  declaredBalance: number; // The new principal
+  date: string;
+  declaredBy?: string;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Loan {
   id: string;
   borrowerName: string;
   principal: number;
+  originalPrincipal?: number;
   interestRate: number; // percentage monthly
   durationMonths: number; // maturity in months
   frequency: PaymentFrequency;
@@ -23,6 +35,7 @@ export interface Loan {
   notes?: string;
   status: LoanStatus;
   isEarlySettlement?: boolean;
+  declarationHistory?: BalanceDeclaration[];
   totalAmount: number;
   totalInterest: number;
   installmentAmount: number;
@@ -38,6 +51,8 @@ export interface Payment {
   photoUrl?: string;
   notes?: string;
   isVerified: boolean;
+  isPreviousCycle?: boolean;
+  declarationId?: string;
   createdAt: string;
 }
 

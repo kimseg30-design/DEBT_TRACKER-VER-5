@@ -16,7 +16,8 @@ import {
   FileText,
   Table as TableIcon,
   Users,
-  Clock
+  Clock,
+  ShieldCheck
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -32,6 +33,7 @@ import { Card, CardContent } from './ui/card';
 import { getPaymentProgress, getRemainingBalance, calculateCurrentDeclaredDetails } from '../lib/calculations';
 import { formatPHTDate } from '../lib/phtDate';
 import PaymentModal from './PaymentModal';
+import DeclareBalanceModal from './DeclareBalanceModal';
 import { ConfirmDialog } from './ConfirmDialog';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
@@ -45,6 +47,7 @@ export default function LoanList() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
+  const [declaringLoanId, setDeclaringLoanId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [loanToDelete, setLoanToDelete] = useState<string | null>(null);
   const [expandedBorrowers, setExpandedBorrowers] = useState<Record<string, boolean>>({});
@@ -355,9 +358,20 @@ export default function LoanList() {
                                       Early Settlement
                                     </Badge>
                                   )}
+                                  {loan.declarationHistory && loan.declarationHistory.length > 0 && (
+                                    <Badge variant="outline" className="bg-emerald-500/10 border-emerald-500/30 text-emerald-400 text-[9px] uppercase tracking-wider py-0.5 font-bold flex items-center gap-1">
+                                      <ShieldCheck className="h-2.5 w-2.5" /> Declared Base
+                                    </Badge>
+                                  )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-300">
                                   <span>Principal: <span className="text-white font-medium">₱{loan.principal.toLocaleString()}</span></span>
+                                  {loan.originalPrincipal && loan.originalPrincipal !== loan.principal && (
+                                    <>
+                                      <span className="text-zinc-700">•</span>
+                                      <span className="text-zinc-400">Orig: ₱{loan.originalPrincipal.toLocaleString()}</span>
+                                    </>
+                                  )}
                                   <span className="text-zinc-700">•</span>
                                   <span>Accrued Interest: <span className="text-amber-400 font-bold">₱{declaredInterest.toLocaleString()}</span> ({elapsedMonths} {elapsedMonths === 1 ? 'Month' : 'Months'})</span>
                                   <span className="text-zinc-700">•</span>
@@ -372,6 +386,21 @@ export default function LoanList() {
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
+                                  {balance > 0 && loan.status !== 'Fully Paid' && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 border-emerald-500/30 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-500/20 text-xs hidden sm:flex items-center"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeclaringLoanId(loan.id);
+                                      }}
+                                      title="Admin: Declare remaining balance as new principal"
+                                    >
+                                      <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+                                      Declare
+                                    </Button>
+                                  )}
                                   <Button 
                                     variant="secondary" 
                                     size="sm" 
@@ -389,6 +418,12 @@ export default function LoanList() {
                                       <MoreVertical className="h-4 w-4" />
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="bg-card border-primary/10 text-white">
+                                      <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeclaringLoanId(loan.id);
+                                      }}>
+                                        <ShieldCheck className="h-4 w-4 mr-2 text-emerald-400" /> Declare New Balance
+                                      </DropdownMenuItem>
                                       <DropdownMenuItem onClick={(e) => {
                                         e.stopPropagation();
                                         navigate(`/edit-loan/${loan.id}`);
@@ -484,6 +519,13 @@ export default function LoanList() {
         <PaymentModal 
           loanId={selectedLoanId} 
           onClose={() => setSelectedLoanId(null)} 
+        />
+      )}
+
+      {declaringLoanId && (
+        <DeclareBalanceModal
+          loanId={declaringLoanId}
+          onClose={() => setDeclaringLoanId(null)}
         />
       )}
 

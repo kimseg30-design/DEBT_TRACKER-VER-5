@@ -33,6 +33,10 @@ export function calculateLoanDetails(
   };
 }
 
+export function getActiveLoanPayments(loanId: string, payments: Payment[]): Payment[] {
+  return payments.filter(p => p.loanId === loanId && !p.isPreviousCycle);
+}
+
 export function getDeclaredMonths(
   loan: Loan, 
   payments: Payment[], 
@@ -46,7 +50,7 @@ export function getDeclaredMonths(
   let endDate = getPhilippineMidnightDate(currentDate);
 
   if (loan.status === 'Fully Paid') {
-    const loanPayments = payments.filter(p => p.loanId === loan.id);
+    const loanPayments = getActiveLoanPayments(loan.id, payments);
     if (loanPayments.length > 0) {
       const lastPaymentTime = Math.max(...loanPayments.map(p => new Date(p.date).getTime()));
       endDate = getPhilippineMidnightDate(lastPaymentTime);
@@ -82,8 +86,7 @@ export function getLoanStatus(
   currentDate: Date = getPhilippineNow(),
   overrideEarlySettlement?: boolean
 ): 'Unpaid' | 'Partial' | 'Fully Paid' {
-  const totalPaid = payments
-    .filter(p => p.loanId === loan.id)
+  const totalPaid = getActiveLoanPayments(loan.id, payments)
     .reduce((sum, p) => sum + p.amount, 0);
 
   if (totalPaid <= 0) return 'Unpaid';
@@ -99,8 +102,7 @@ export function getRemainingBalance(
   currentDate: Date = getPhilippineNow(),
   overrideEarlySettlement?: boolean
 ): number {
-  const totalPaid = payments
-    .filter(p => p.loanId === loan.id)
+  const totalPaid = getActiveLoanPayments(loan.id, payments)
     .reduce((sum, p) => sum + p.amount, 0);
   
   if (loan.status === 'Fully Paid' && !overrideEarlySettlement) {
@@ -117,8 +119,7 @@ export function getPaymentProgress(
   currentDate: Date = getPhilippineNow(),
   overrideEarlySettlement?: boolean
 ): number {
-  const totalPaid = payments
-    .filter(p => p.loanId === loan.id)
+  const totalPaid = getActiveLoanPayments(loan.id, payments)
     .reduce((sum, p) => sum + p.amount, 0);
   
   if (loan.status === 'Fully Paid' && !overrideEarlySettlement) return 100;
@@ -132,8 +133,9 @@ export function calculateLatePenalty(loan: Loan, payments: Payment[], currentDat
   if (rate <= 0) return 0;
 
   const frequencyDays = loan.frequency === 'Weekly' ? 7 : loan.frequency === 'Biweekly' ? 14 : 30;
-  const lastActivityDate = payments.length > 0 
-    ? getPhilippineMidnightDate(Math.max(...payments.map(p => new Date(p.date).getTime())))
+  const activePayments = getActiveLoanPayments(loan.id, payments);
+  const lastActivityDate = activePayments.length > 0 
+    ? getPhilippineMidnightDate(Math.max(...activePayments.map(p => new Date(p.date).getTime())))
     : getPhilippineMidnightDate(loan.startDate);
 
   const daysSinceLastActivity = differenceInDays(getPhilippineMidnightDate(currentDate), lastActivityDate);

@@ -1,7 +1,7 @@
 import { useStorage } from '../lib/storage';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { cn } from '../lib/utils';
-import { calculateCurrentDeclaredDetails } from '../lib/calculations';
+import { calculateCurrentDeclaredDetails, getRemainingBalance } from '../lib/calculations';
 import { formatPHTDate } from '../lib/phtDate';
 import { 
   TrendingUp, 
@@ -37,7 +37,7 @@ export default function Dashboard() {
   const totalExpected = totalLent + totalInterest;
 
   const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
-  const remainingBalance = totalExpected - totalCollected;
+  const remainingBalance = loans.reduce((sum, l) => sum + getRemainingBalance(l, payments), 0);
   
   const activeMembers = members.filter(m => m.status === 'Active').length;
   const totalContributions = contributions.reduce((sum, c) => sum + c.amount, 0);

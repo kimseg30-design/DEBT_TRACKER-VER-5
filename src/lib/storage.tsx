@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { Loan, Payment, StorageType, UserProfile, Member, Contribution, AuditLog } from '../types';
+import { Loan, Payment, StorageType, UserProfile, Member, Contribution, AuditLog, BalanceDeclaration } from '../types';
+import { calculateLoanDetails } from './calculations';
 import { auth, db, collection, doc, setDoc, getDocs, query, where, onSnapshot, deleteDoc, updateDoc, signInWithGoogle, logout, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { toast } from 'sonner';
@@ -16,6 +17,7 @@ interface StorageContextType {
   addLoan: (loan: Omit<Loan, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateLoan: (id: string, loan: Partial<Loan>) => Promise<void>;
   deleteLoan: (id: string) => Promise<void>;
+  declareNewBalance: (loanId: string, newBalance: number, declarationDate: string, notes?: string) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
   addMember: (member: Omit<Member, 'id' | 'createdAt'>) => Promise<void>;
@@ -209,6 +211,94 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
     await logAction('DELETE_LOAN', `Deleted loan for ${loan?.borrowerName || id}`);
+  };
+
+  const declareNewBalance = async (
+    loanId: string, 
+    newBalance: number, 
+    declarationDate: string, 
+    notes?: string
+  ) => {
+    const loan = loans.find(l => l.id === loanId);
+    if (!loan) return;
+
+    const now = new Date().toISOString();
+    const declarationId = crypto.randomUUID();
+    const currentActivePayments = payments.filter(p => p.loanId === loanId && !p.isPreviousCycle);
+    const totalPaidInCycle = currentActivePayments.reduce((sum, p) => sum + p.amount, 0);
+
+    const declaration: BalanceDeclaration = {
+      id: declarationId,
+      previousPrincipal: loan.principal,
+      previousTotalPaid: totalPaidInCycle,
+      declaredBalance: newBalance,
+      date: declarationDate,
+      declaredBy: user?.displayName || user?.email || 'Admin',
+      notes: notes || '',
+      createdAt: now,
+    };
+
+    const calculated = calculateLoanDetails(
+      newBalance,
+      loan.interestRate,
+      loan.durationMonths,
+      loan.frequency
+    );
+
+    const updatedLoan: Loan = {
+      ...loan,
+      originalPrincipal: loan.originalPrincipal || loan.principal,
+      principal: newBalance,
+      startDate: declarationDate,
+      totalAmount: calculated.totalAmount,
+      totalInterest: calculated.totalInterest,
+      installmentAmount: calculated.installmentAmount,
+      status: 'Unpaid',
+      isEarlySettlement: false,
+      declarationHistory: [...(loan.declarationHistory || []), declaration],
+      updatedAt: now,
+    };
+
+    // Mark current cycle payments as previous cycle
+    const updatedPayments = payments.map(p => {
+      if (p.loanId === loanId && !p.isPreviousCycle) {
+        return { ...p, isPreviousCycle: true, declarationId };
+      }
+      return p;
+    });
+
+    if (storageType === 'local') {
+      const updatedLoans = loans.map(l => l.id === loanId ? updatedLoan : l);
+      setLoans(updatedLoans);
+      setPayments(updatedPayments);
+      localStorage.setItem('loans', JSON.stringify(updatedLoans));
+      localStorage.setItem('payments', JSON.stringify(updatedPayments));
+    } else if (user) {
+      await updateDoc(doc(db, 'loans', loanId), {
+        originalPrincipal: updatedLoan.originalPrincipal,
+        principal: updatedLoan.principal,
+        startDate: updatedLoan.startDate,
+        totalAmount: updatedLoan.totalAmount,
+        totalInterest: updatedLoan.totalInterest,
+        installmentAmount: updatedLoan.installmentAmount,
+        status: updatedLoan.status,
+        isEarlySettlement: false,
+        declarationHistory: updatedLoan.declarationHistory,
+        updatedAt: now,
+      });
+
+      for (const p of currentActivePayments) {
+        await updateDoc(doc(db, 'payments', p.id), {
+          isPreviousCycle: true,
+          declarationId,
+        });
+      }
+    }
+
+    await logAction(
+      'DECLARE_NEW_BALANCE',
+      `Admin approved & declared new balance of ₱${newBalance.toLocaleString()} for ${loan.borrowerName} (Prev Principal: ₱${loan.principal.toLocaleString()}, Cycle Paid: ₱${totalPaidInCycle.toLocaleString()})`
+    );
   };
 
   const addPayment = async (paymentData: Omit<Payment, 'id' | 'createdAt'>) => {
@@ -452,6 +542,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addLoan,
       updateLoan,
       deleteLoan,
+      declareNewBalance,
       addPayment,
       deletePayment,
       addMember,

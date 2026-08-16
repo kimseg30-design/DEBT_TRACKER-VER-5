@@ -12,8 +12,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { Camera, Upload, X, CheckCircle, Trash2 } from 'lucide-react';
-import { getLoanStatus, calculateCurrentDeclaredDetails, getRemainingBalance } from '../lib/calculations';
+import { Camera, Upload, X, CheckCircle, Trash2, ShieldCheck, History, ArrowRight } from 'lucide-react';
+import { getLoanStatus, calculateCurrentDeclaredDetails, getRemainingBalance, getActiveLoanPayments } from '../lib/calculations';
 import { getPhilippineYMD, getPhilippineMidnightDate, formatPHTDate } from '../lib/phtDate';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -23,7 +23,7 @@ interface PaymentModalProps {
 }
 
 export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
-  const { loans, payments, addPayment, updateLoan, deletePayment } = useStorage();
+  const { loans, payments, addPayment, updateLoan, deletePayment, declareNewBalance } = useStorage();
   const loan = loans.find(l => l.id === loanId);
   const loanPayments = payments.filter(p => p.loanId === loanId);
   
@@ -33,6 +33,8 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
   const [isEarlySettlementSelected, setIsEarlySettlementSelected] = useState(loan?.isEarlySettlement || false);
+  const [shouldDeclareRemainingBalance, setShouldDeclareRemainingBalance] = useState(false);
+  const [showDeclarationHistory, setShowDeclarationHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!loan) return null;
@@ -42,17 +44,20 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
   
   const { elapsedMonths, declaredInterest, declaredTotalAmount } = calculateCurrentDeclaredDetails(
     loan, 
-    loanPayments, 
+    payments, 
     selectedDate, 
     isEarlySettlementSelected
   );
 
   const currentBalance = getRemainingBalance(
     loan, 
-    loanPayments, 
+    payments, 
     selectedDate, 
     isEarlySettlementSelected
   );
+
+  const parsedAmount = parseFloat(amount) || 0;
+  const simulatedRemainingAfterPayment = Math.max(0, currentBalance - parsedAmount);
 
   const handleAutoFillRemainingBalance = () => {
     setAmount(currentBalance.toString());
@@ -71,7 +76,7 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) {
+    if (!amount || parsedAmount <= 0) {
       toast.error('Please enter a valid amount');
       return;
     }
@@ -79,7 +84,7 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
     try {
       const paymentData = {
         loanId,
-        amount: parseFloat(amount),
+        amount: parsedAmount,
         date: new Date(date).toISOString(),
         notes,
         ...(photo ? { photoUrl: photo } : {}),
@@ -96,7 +101,19 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
         isEarlySettlement: !!(isEarlySettlementSelected || loan.isEarlySettlement)
       });
 
-      toast.success('Payment recorded successfully');
+      // If Admin opted to declare remaining balance as new principal
+      if (shouldDeclareRemainingBalance && simulatedRemainingAfterPayment > 0) {
+        await declareNewBalance(
+          loanId,
+          simulatedRemainingAfterPayment,
+          new Date(date).toISOString(),
+          notes ? `Auto-declared upon payment: ${notes}` : `Declared remaining balance of ₱${simulatedRemainingAfterPayment.toLocaleString()} as new principal base.`
+        );
+        toast.success(`Payment recorded & New Principal ₱${simulatedRemainingAfterPayment.toLocaleString()} declared!`);
+      } else {
+        toast.success('Payment recorded successfully');
+      }
+
       onClose();
     } catch (error) {
       toast.error('Failed to record payment');
@@ -204,6 +221,29 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
                 )}
               </div>
 
+              {/* Admin Option: Declare Remaining Balance as New Base Principal */}
+              {simulatedRemainingAfterPayment > 0 && parsedAmount > 0 && (
+                <div className="p-3 bg-emerald-950/20 border border-emerald-500/30 rounded-xl space-y-1.5 animate-in fade-in">
+                  <div className="flex items-start space-x-2">
+                    <input 
+                      id="declareRemaining" 
+                      type="checkbox" 
+                      checked={shouldDeclareRemainingBalance}
+                      onChange={(e) => setShouldDeclareRemainingBalance(e.target.checked)}
+                      className="rounded border-emerald-500/40 bg-background text-emerald-500 focus:ring-emerald-500 h-4 w-4 mt-0.5 cursor-pointer"
+                    />
+                    <div className="text-xs">
+                      <Label htmlFor="declareRemaining" className="font-bold text-emerald-400 cursor-pointer block">
+                        Admin: Declare ₱{simulatedRemainingAfterPayment.toLocaleString()} as New Base Balance
+                      </Label>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">
+                        Resets principal to ₱{simulatedRemainingAfterPayment.toLocaleString()}. Future interest ({loan.interestRate}%/mo) will auto-calculate on this remaining balance.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="notes" className="text-zinc-300">Notes (Optional)</Label>
                 <Textarea 
@@ -258,14 +298,59 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
           </div>
 
           <div className="space-y-6">
-            <h3 className="text-sm font-medium text-zinc-300 uppercase tracking-wider">Payment History</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-zinc-300 uppercase tracking-wider">Payment History</h3>
+              {loan.declarationHistory && loan.declarationHistory.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDeclarationHistory(!showDeclarationHistory)}
+                  className="text-xs text-primary h-7 px-2 hover:bg-primary/10"
+                >
+                  <History className="h-3.5 w-3.5 mr-1" />
+                  {loan.declarationHistory.length} Declarations
+                </Button>
+              )}
+            </div>
+
+            {/* Declaration History Collapsible */}
+            {showDeclarationHistory && loan.declarationHistory && loan.declarationHistory.length > 0 && (
+              <div className="p-3 bg-zinc-950 border border-primary/20 rounded-xl space-y-2 text-xs animate-in slide-in-from-top-2">
+                <span className="font-bold text-primary block uppercase text-[10px] tracking-wider">
+                  Admin Balance Declarations
+                </span>
+                <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                  {loan.declarationHistory.map((d, i) => (
+                    <div key={d.id || i} className="p-2 bg-background/50 rounded-lg border border-zinc-800 text-[11px]">
+                      <div className="flex justify-between font-bold">
+                        <span className="text-emerald-400">New Balance: ₱{d.declaredBalance.toLocaleString()}</span>
+                        <span className="text-zinc-400">{formatPHTDate(d.date)}</span>
+                      </div>
+                      <div className="text-zinc-400 text-[10px] mt-0.5">
+                        Prev Principal: ₱{d.previousPrincipal.toLocaleString()} • Paid in Cycle: ₱{d.previousTotalPaid.toLocaleString()}
+                      </div>
+                      {d.notes && <div className="text-zinc-500 italic text-[10px] mt-0.5">"{d.notes}"</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3 max-h-[400px] overflow-auto pr-2">
               {loanPayments.length > 0 ? (
                 loanPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((p) => (
                   <div key={p.id} className="p-4 bg-background/50 border border-primary/10 rounded-xl space-y-2">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-lg font-bold text-white">₱{p.amount.toLocaleString()}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-bold text-white">₱{p.amount.toLocaleString()}</p>
+                          {p.isPreviousCycle && (
+                            <span className="text-[9px] px-1.5 py-0.5 bg-zinc-800 text-zinc-400 rounded font-semibold border border-zinc-700">
+                              Previous Cycle
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-zinc-400">{formatPHTDate(p.date)}</p>
                       </div>
                       <div className="flex items-center gap-1">
