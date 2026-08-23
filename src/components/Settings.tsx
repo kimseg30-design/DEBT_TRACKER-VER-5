@@ -13,9 +13,12 @@ import {
   AlertTriangle,
   FileJson,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Smartphone,
+  CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import InstallAppModal from './InstallAppModal';
 
 export default function Settings() {
   const { 
@@ -31,6 +34,7 @@ export default function Settings() {
   } = useStorage();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   const handleExport = () => {
     const data = exportData();
@@ -75,10 +79,36 @@ export default function Settings() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-white neon-text">Settings</h2>
-        <p className="text-zinc-400">Manage your data storage and backup preferences.</p>
+        <p className="text-zinc-400">Manage your data storage, backup preferences, and app installation.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
+        {/* App Installation Card */}
+        <Card className="bg-card border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.08)] md:col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+                  <Smartphone className="h-6 w-6" />
+                </div>
+                <div>
+                  <CardTitle className="text-white text-lg">App Download & Installation (PWA)</CardTitle>
+                  <CardDescription className="text-zinc-400 text-xs">
+                    Download and install DebtFlow as a standalone application on Android, iPhone, iPad, Windows, or Mac.
+                  </CardDescription>
+                </div>
+              </div>
+              <Button 
+                onClick={() => setIsInstallModalOpen(true)}
+                className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold gap-2 text-xs h-9 px-4"
+              >
+                <Download className="h-4 w-4" />
+                <span>Install / Download App</span>
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
+
         <Card className="bg-card border-primary/10 shadow-[0_0_20px_rgba(var(--primary),0.05)]">
           <CardHeader>
             <div className="flex items-center gap-3 mb-2">
@@ -220,6 +250,11 @@ export default function Settings() {
           </CardContent>
         </Card>
       </div>
+
+      <InstallAppModal 
+        isOpen={isInstallModalOpen} 
+        onClose={() => setIsInstallModalOpen(false)} 
+      />
     </div>
   );
 }

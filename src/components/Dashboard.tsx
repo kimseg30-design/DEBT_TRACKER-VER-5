@@ -48,7 +48,7 @@ export default function Dashboard() {
   const totalExpected = totalLent + totalAccruedInterest;
 
   // 4. Contractual Full-Term Interest (if loans reach full duration)
-  const kabuoangContractInterest = loans.reduce((sum, l) => {
+  const fullContractInterest = loans.reduce((sum, l) => {
     const contractInterest = l.totalInterest || (l.principal * (l.interestRate / 100) * (l.durationMonths || 1));
     return sum + contractInterest;
   }, 0);
@@ -137,60 +137,60 @@ export default function Dashboard() {
   // 6 Primary Portfolio Metric Cards
   const stats = [
     { 
-      name: '1. Kabuoang Naipautang (Principal)', 
+      name: '1. Total Principal Disbursed', 
       value: `₱${totalLent.toLocaleString()}`, 
-      formula: 'Sum ng Principal ng lahat ng Pautang',
-      subtext: `${loans.length} Kabuuang Loans`,
+      formula: 'Sum of Principal across all loans',
+      subtext: `${loans.length} Total Loans`,
       icon: DollarSign, 
       color: 'text-primary', 
       bg: 'bg-primary/10', 
       shadow: 'shadow-[0_0_15px_rgba(var(--primary),0.2)]' 
     },
     { 
-      name: '2. Kabuoang Pumatak na Tubo (Interest)', 
+      name: '2. Accrued Interest to Date', 
       value: `₱${totalAccruedInterest.toLocaleString()}`, 
-      formula: `Bayad na: ₱${totalPaidInterest.toLocaleString()} | Di pa bayad: ₱${unpaidAccruedInterest.toLocaleString()}`,
-      subtext: `Full-term Contract: ₱${kabuoangContractInterest.toLocaleString()}`,
+      formula: `Paid: ₱${totalPaidInterest.toLocaleString()} | Unpaid: ₱${unpaidAccruedInterest.toLocaleString()}`,
+      subtext: `Full-term Contract: ₱${fullContractInterest.toLocaleString()}`,
       icon: Percent, 
       color: 'text-amber-400', 
       bg: 'bg-amber-400/10', 
       shadow: 'shadow-[0_0_15px_rgba(251,191,36,0.2)]' 
     },
     { 
-      name: '3. Inaasahang Kabuuan (Expected Total)', 
+      name: '3. Expected Total to Date', 
       value: `₱${totalExpected.toLocaleString()}`, 
-      formula: `Principal (₱${totalLent.toLocaleString()}) + Tubo (₱${totalAccruedInterest.toLocaleString()})`,
-      subtext: `Kabuuang dapat masingil hanggang ngayon`,
+      formula: `Principal (₱${totalLent.toLocaleString()}) + Interest (₱${totalAccruedInterest.toLocaleString()})`,
+      subtext: `Total collectible amount up to today`,
       icon: TrendingUp, 
       color: 'text-secondary', 
       bg: 'bg-secondary/10', 
       shadow: 'shadow-[0_0_15px_rgba(var(--secondary),0.2)]' 
     },
     { 
-      name: '4. Kabuoang Nakolekta (Total Collected)', 
+      name: '4. Total Collections Received', 
       value: `₱${totalCollected.toLocaleString()}`, 
-      formula: `Principal (₱${totalPrincipalCollected.toLocaleString()}) + Tubo (₱${totalPaidInterest.toLocaleString()})`,
-      subtext: `${collectionPercentage}% ng Inaasahang Kabuuan`,
+      formula: `Principal (₱${totalPrincipalCollected.toLocaleString()}) + Interest (₱${totalPaidInterest.toLocaleString()})`,
+      subtext: `${collectionPercentage}% of Expected Total`,
       icon: ArrowDownRight, 
       color: 'text-accent', 
       bg: 'bg-accent/10', 
       shadow: 'shadow-[0_0_15px_rgba(var(--accent),0.2)]' 
     },
     { 
-      name: '5. Natitirang Balanse (Remaining Balance)', 
+      name: '5. Total Remaining Balance', 
       value: `₱${Math.max(0, remainingBalance).toLocaleString()}`, 
-      formula: `Inaasahan (₱${totalExpected.toLocaleString()}) - Nakolekta (₱${totalCollected.toLocaleString()})`,
-      subtext: `Natitirang sisingilin sa aktibong pautang`,
+      formula: `Expected (₱${totalExpected.toLocaleString()}) - Collected (₱${totalCollected.toLocaleString()})`,
+      subtext: `Outstanding balance on active loans`,
       icon: CheckCircle2, 
       color: 'text-emerald-400', 
       bg: 'bg-emerald-400/10', 
       shadow: 'shadow-[0_0_15px_rgba(52,211,153,0.2)]' 
     },
     { 
-      name: '6. Pondo ng Miyembro (Contributions)', 
+      name: '6. Member Contributions', 
       value: `₱${totalContributions.toLocaleString()}`, 
-      formula: `Mula sa ${activeMembers} Aktibong Miyembro`,
-      subtext: `Ipon / Savings sa Kooperatiba`,
+      formula: `From ${activeMembers} Active Members`,
+      subtext: `Accumulated Member Savings`,
       icon: PiggyBank, 
       color: 'text-violet-400', 
       bg: 'bg-violet-400/10', 
@@ -199,8 +199,8 @@ export default function Dashboard() {
   ];
 
   const chartData = [
-    { name: 'Nakolekta na (Collected)', value: totalCollected, color: 'oklch(0.85 0.35 140)' },
-    { name: 'Natitirang Balanse (Remaining)', value: Math.max(0, remainingBalance), color: 'oklch(0.6 0.2 20)' },
+    { name: 'Collected', value: totalCollected, color: 'oklch(0.85 0.35 140)' },
+    { name: 'Remaining Balance', value: Math.max(0, remainingBalance), color: 'oklch(0.6 0.2 20)' },
   ];
 
   const recentPayments = [...payments]
@@ -213,7 +213,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white neon-text">Dashboard</h2>
-          <p className="text-zinc-300">Pangkalahatang ulat ng pautang, singilin, tubo, at koleksyon.</p>
+          <p className="text-zinc-300">Comprehensive overview of loans, interest accruals, collections, and member funds.</p>
         </div>
       </div>
 
@@ -253,7 +253,7 @@ export default function Dashboard() {
             <div className="p-1.5 bg-primary/20 rounded-lg text-primary">
               <Calculator className="h-4 w-4" />
             </div>
-            <span>Paano Kinukwenta ang mga Datos (Step-by-Step Calculation Guide)</span>
+            <span>Step-by-Step Calculation Guide</span>
           </div>
           <Badge variant="outline" className="bg-primary/10 border-primary/30 text-primary text-xs w-fit">
             100% Reconciled
@@ -264,54 +264,54 @@ export default function Dashboard() {
           {/* Step 1 */}
           <div className="p-3 bg-background/60 rounded-xl border border-zinc-800/80 space-y-1.5">
             <div className="font-bold text-amber-400 flex items-center gap-1.5 text-xs">
-              <span>1. Inaasahang Kabuuan (Expected)</span>
+              <span>1. Expected Total (To Date)</span>
             </div>
             <p className="text-zinc-300 font-mono text-[11px]">
-              ₱{totalLent.toLocaleString()} (Principal) + ₱{totalAccruedInterest.toLocaleString()} (Tubo)
+              ₱{totalLent.toLocaleString()} (Principal) + ₱{totalAccruedInterest.toLocaleString()} (Interest)
             </p>
             <p className="text-white font-bold text-sm">
               = ₱{totalExpected.toLocaleString()}
             </p>
             <p className="text-[10px] text-zinc-400">
-              Ang puhunan kasama ang pumatak na tubo hanggang sa araw na ito.
+              Total disbursed principal plus interest accrued up to today.
             </p>
           </div>
 
           {/* Step 2 */}
           <div className="p-3 bg-background/60 rounded-xl border border-zinc-800/80 space-y-1.5">
             <div className="font-bold text-emerald-400 flex items-center gap-1.5 text-xs">
-              <span>2. Kabuoang Nakolekta (Collected)</span>
+              <span>2. Total Collections (Received)</span>
             </div>
             <p className="text-zinc-300 font-mono text-[11px]">
-              ₱{totalPrincipalCollected.toLocaleString()} (Principal Nabalik) + ₱{totalPaidInterest.toLocaleString()} (Tubong Naibayad)
+              ₱{totalPrincipalCollected.toLocaleString()} (Principal Returned) + ₱{totalPaidInterest.toLocaleString()} (Interest Paid)
             </p>
             <p className="text-white font-bold text-sm">
               = ₱{totalCollected.toLocaleString()}
             </p>
             <p className="text-[10px] text-zinc-400">
-              Lahat ng perang aktwal nang nahahawakan at naibayad ng mga umutang.
+              Total actual cash payments collected and received from borrowers.
             </p>
           </div>
 
           {/* Step 3 */}
           <div className="p-3 bg-background/60 rounded-xl border border-zinc-800/80 space-y-1.5">
             <div className="font-bold text-primary flex items-center gap-1.5 text-xs">
-              <span>3. Natitirang Balanse (Remaining)</span>
+              <span>3. Total Remaining Balance</span>
             </div>
             <p className="text-zinc-300 font-mono text-[11px]">
-              ₱{totalExpected.toLocaleString()} (Inaasahan) - ₱{totalCollected.toLocaleString()} (Nakolekta)
+              ₱{totalExpected.toLocaleString()} (Expected) - ₱{totalCollected.toLocaleString()} (Collected)
             </p>
             <p className="text-white font-bold text-sm">
               = ₱{Math.max(0, remainingBalance).toLocaleString()}
             </p>
             <p className="text-[10px] text-zinc-400">
-              Ang natitira pang dapat bayaran at singilin sa lahat ng aktibong pautang.
+              The remaining outstanding balance to be collected across active loans.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Summary Breakdown ng mga Fully Paid Borrowers */}
+      {/* Summary Breakdown of Fully Paid Borrowers */}
       <Card className="bg-card border-emerald-500/20 shadow-[0_0_25px_rgba(16,185,129,0.08)] overflow-hidden">
         <CardHeader className="border-b border-zinc-800/80 pb-4 bg-emerald-950/10">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -327,7 +327,7 @@ export default function Dashboard() {
                   </Badge>
                 </CardTitle>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Talaan ng mga nakakumpleto na ng bayad kasama ang kabuoang interes na kinita.
+                  List of borrowers who completed full payment along with total interest earned.
                 </p>
               </div>
             </div>
@@ -357,11 +357,11 @@ export default function Dashboard() {
                 <thead>
                   <tr className="border-b border-zinc-800/80 bg-background/40 text-zinc-400 font-semibold uppercase text-[10px] tracking-wider">
                     <th className="py-3 px-4">Borrower Name</th>
-                    <th className="py-3 px-4">Principal Naipautang</th>
+                    <th className="py-3 px-4">Principal Disbursed</th>
                     <th className="py-3 px-4">Interest Rate</th>
-                    <th className="py-3 px-4 text-emerald-400">Interes na Naibayad</th>
-                    <th className="py-3 px-4 text-white">Kabuoang Naibayad</th>
-                    <th className="py-3 px-4">Petsa Natapos</th>
+                    <th className="py-3 px-4 text-emerald-400">Interest Paid</th>
+                    <th className="py-3 px-4 text-white">Total Amount Paid</th>
+                    <th className="py-3 px-4">Date Completed</th>
                     <th className="py-3 px-4 text-right">Status</th>
                   </tr>
                 </thead>
@@ -393,7 +393,7 @@ export default function Dashboard() {
                           <span>{formatPHTDate(item.completedDate)}</span>
                         </div>
                         <span className="text-[10px] text-zinc-500 block mt-0.5">
-                          Nagsimula: {formatPHTDate(item.startDate)}
+                          Started: {formatPHTDate(item.startDate)}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">
@@ -409,9 +409,9 @@ export default function Dashboard() {
           ) : (
             <div className="flex flex-col items-center justify-center py-10 text-center px-4 text-zinc-400 space-y-2">
               <ShieldCheck className="h-10 w-10 text-zinc-600 mb-1" />
-              <p className="font-medium text-sm text-zinc-300">Wala pang fully paid na borrowers sa kasalukuyan.</p>
+              <p className="font-medium text-sm text-zinc-300">No fully paid borrowers recorded yet.</p>
               <p className="text-xs text-zinc-500 max-w-sm">
-                Kapag natapos at nabayaran nang buo ng isang borrower ang kanyang loan kasama ang interes, awtomatikong lalabas dito ang kanyang summary breakdown.
+                When a borrower completes paying their loan and interest in full, their summary breakdown will automatically appear here.
               </p>
             </div>
           )}
@@ -422,7 +422,7 @@ export default function Dashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-1 md:col-span-2 lg:col-span-4 bg-card border-primary/10">
           <CardHeader>
-            <CardTitle className="text-white neon-text">Status ng Koleksyon (Collection Progress)</CardTitle>
+            <CardTitle className="text-white neon-text">Collection Progress</CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -446,7 +446,7 @@ export default function Dashboard() {
 
         <Card className="col-span-1 md:col-span-2 lg:col-span-3 bg-card border-primary/10">
           <CardHeader>
-            <CardTitle className="text-white neon-text">Kamakailang mga Bayad (Recent Payments)</CardTitle>
+            <CardTitle className="text-white neon-text">Recent Payments</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -475,7 +475,7 @@ export default function Dashboard() {
               ) : (
                 <div className="flex flex-col items-center justify-center py-10 text-zinc-300">
                   <Clock className="h-10 w-10 mb-2 opacity-20" />
-                  <p>Walang kamakailang bayad</p>
+                  <p>No recent payments</p>
                 </div>
               )}
             </div>

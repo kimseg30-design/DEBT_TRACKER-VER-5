@@ -18,7 +18,9 @@ import {
   X,
   UserPlus,
   PiggyBank,
-  Activity
+  Activity,
+  Download,
+  Smartphone
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from './components/ui/button';
@@ -31,14 +33,16 @@ import Members from './components/Members';
 import Contributions from './components/Contributions';
 import AuditLogs from './components/AuditLogs';
 import Auth from './components/Auth';
+import InstallAppModal from './components/InstallAppModal';
 import { cn } from './lib/utils';
 
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  onOpenInstall: () => void;
 }
 
-function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
+function Sidebar({ isOpen, setIsOpen, onOpenInstall }: SidebarProps) {
   const { user, login, handleLogout, storageType } = useStorage();
   const location = useLocation();
 
@@ -59,7 +63,7 @@ function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col min-h-full p-6">
-          <div className="flex items-center justify-between gap-3 mb-10">
+          <div className="flex items-center justify-between gap-3 mb-8">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary rounded-lg shadow-[0_0_15px_rgba(var(--primary),0.5)]">
                 <Wallet className="h-6 w-6 text-primary-foreground" />
@@ -76,7 +80,7 @@ function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             </Button>
           </div>
 
-          <nav className="flex-1 space-y-2">
+          <nav className="flex-1 space-y-1.5">
             {navItems.map((item) => (
               <Link 
                 key={item.path} 
@@ -93,6 +97,22 @@ function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 {item.name}
               </Link>
             ))}
+
+            {/* Install / Download App Navigation Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenInstall();
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 border border-emerald-500/20 mt-3"
+            >
+              <Download className="h-5 w-5 text-emerald-400" />
+              <div className="flex flex-col text-left">
+                <span className="font-medium text-sm">Download App</span>
+                <span className="text-[10px] text-emerald-500/80">Install on any device</span>
+              </div>
+            </button>
           </nav>
 
           <div className="mt-auto pt-6 border-t border-primary/10">
@@ -121,6 +141,7 @@ function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 function AppContent() {
   const { user } = useStorage();
   const [isOpen, setIsOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   
   if (!user) {
     return <Auth />;
@@ -129,21 +150,35 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-black text-zinc-100 flex flex-col lg:flex-row">
       {/* Mobile Sticky Header */}
-      <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-6 py-4 bg-black/90 backdrop-blur-md border-b border-primary/10">
-        <div className="flex items-center gap-3">
+      <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-black/90 backdrop-blur-md border-b border-primary/10">
+        <div className="flex items-center gap-2.5">
           <div className="p-1.5 bg-primary rounded-lg shadow-[0_0_10px_rgba(var(--primary),0.4)]">
             <Wallet className="h-4 w-4 text-primary-foreground" />
           </div>
           <span className="text-lg font-bold text-white neon-text tracking-tight">DebtFlow</span>
         </div>
-        <Button 
-          variant="outline" 
-          size="icon" 
-          className="border-primary/20 text-white hover:bg-primary/10 hover:text-primary transition-all duration-300 h-9 w-9" 
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          {isOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-        </Button>
+
+        <div className="flex items-center gap-2">
+          {/* Quick Download App Header Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsInstallModalOpen(true)}
+            className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/15 text-xs h-8 gap-1.5 px-2.5"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Install</span>
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="border-primary/20 text-white hover:bg-primary/10 hover:text-primary transition-all duration-300 h-8 w-8" 
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </Button>
+        </div>
       </header>
 
       {/* Sidebar Backdrop Overlay for Mobile */}
@@ -154,7 +189,8 @@ function AppContent() {
         />
       )}
 
-      <Sidebar isOpen={isOpen} setIsOpen={setIsOpen} />
+      <Sidebar isOpen={isOpen} setIsOpen={setIsOpen} onOpenInstall={() => setIsInstallModalOpen(true)} />
+      
       <main className="flex-1 lg:ml-64 p-4 lg:p-8 overflow-auto">
         <div className="max-w-7xl mx-auto">
           <Routes>
@@ -169,6 +205,11 @@ function AppContent() {
           </Routes>
         </div>
       </main>
+
+      <InstallAppModal 
+        isOpen={isInstallModalOpen} 
+        onClose={() => setIsInstallModalOpen(false)} 
+      />
     </div>
   );
 }
