@@ -1,5 +1,6 @@
 {
   "name": "DebtFlow - Loan Management System",
-  "description": "A professional debt tracking and loan management system with local and cloud storage options, automated interest calculations, and detailed financial analytics.",
-  "requestFramePermissions": ["camera"]
+  "description": "A professional debt tracking and loan management system with local and cloud storage options, automated interest calculations, official loan document generation (Loan Agreement, Disclosure Statement, Promissory Note), and detailed financial analytics.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

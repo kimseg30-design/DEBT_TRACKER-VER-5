@@ -30,10 +30,11 @@ import {
   DropdownMenuTrigger 
 } from './ui/dropdown-menu';
 import { Card, CardContent } from './ui/card';
-import { getPaymentProgress, getRemainingBalance, calculateCurrentDeclaredDetails } from '../lib/calculations';
+import { getPaymentProgress, getRemainingBalance, calculateCurrentDeclaredDetails, getFirstPaymentDate } from '../lib/calculations';
 import { formatPHTDate } from '../lib/phtDate';
 import PaymentModal from './PaymentModal';
 import DeclareBalanceModal from './DeclareBalanceModal';
+import LoanDocumentsModal from './LoanDocumentsModal';
 import { ConfirmDialog } from './ConfirmDialog';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
@@ -48,6 +49,7 @@ export default function LoanList() {
   const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
   const [declaringLoanId, setDeclaringLoanId] = useState<string | null>(null);
+  const [viewingDocLoanId, setViewingDocLoanId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [loanToDelete, setLoanToDelete] = useState<string | null>(null);
   const [expandedBorrowers, setExpandedBorrowers] = useState<Record<string, boolean>>({});
@@ -376,6 +378,8 @@ export default function LoanList() {
                                   <span>Accrued Interest: <span className="text-amber-400 font-bold">₱{declaredInterest.toLocaleString()}</span> ({elapsedMonths} {elapsedMonths === 1 ? 'Month' : 'Months'})</span>
                                   <span className="text-zinc-700">•</span>
                                   <span>{loan.frequency}</span>
+                                  <span className="text-zinc-700">•</span>
+                                  <span>1st Due: <span className="text-amber-300 font-semibold">{formatPHTDate(getFirstPaymentDate(loan.startDate, loan.frequency))}</span></span>
                                 </div>
                               </div>
 
@@ -418,6 +422,12 @@ export default function LoanList() {
                                       <MoreVertical className="h-4 w-4" />
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="bg-card border-primary/10 text-white">
+                                      <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        setViewingDocLoanId(loan.id);
+                                      }}>
+                                        <FileText className="h-4 w-4 mr-2 text-primary" /> Loan Documents (Paper, PN, DS)
+                                      </DropdownMenuItem>
                                       <DropdownMenuItem onClick={(e) => {
                                         e.stopPropagation();
                                         setDeclaringLoanId(loan.id);
@@ -526,6 +536,14 @@ export default function LoanList() {
         <DeclareBalanceModal
           loanId={declaringLoanId}
           onClose={() => setDeclaringLoanId(null)}
+        />
+      )}
+
+      {viewingDocLoanId && (
+        <LoanDocumentsModal
+          loan={loans.find(l => l.id === viewingDocLoanId) || null}
+          isOpen={!!viewingDocLoanId}
+          onClose={() => setViewingDocLoanId(null)}
         />
       )}
 

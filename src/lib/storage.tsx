@@ -14,7 +14,7 @@ interface StorageContextType {
   user: UserProfile | null;
   storageType: StorageType;
   setStorageType: (type: StorageType) => void;
-  addLoan: (loan: Omit<Loan, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  addLoan: (loan: Omit<Loan, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Loan>;
   updateLoan: (id: string, loan: Partial<Loan>) => Promise<void>;
   deleteLoan: (id: string) => Promise<void>;
   declareNewBalance: (loanId: string, newBalance: number, declarationDate: string, notes?: string) => Promise<void>;
@@ -152,7 +152,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const addLoan = async (loanData: Omit<Loan, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const addLoan = async (loanData: Omit<Loan, 'id' | 'createdAt' | 'updatedAt'>): Promise<Loan> => {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const newLoan: Loan = {
@@ -171,6 +171,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await setDoc(doc(db, 'loans', id), { ...newLoan, uid: user.uid });
     }
     await logAction('ADD_LOAN', `Added loan for ${loanData.borrowerName} (₱${loanData.principal})`);
+    return newLoan;
   };
 
   const updateLoan = async (id: string, loanData: Partial<Loan>) => {

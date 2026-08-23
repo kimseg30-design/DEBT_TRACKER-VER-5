@@ -23,7 +23,7 @@ export function calculateLoanDetails(
   // Total Interest = Principal * (Rate/100) * Months
   const totalInterest = principal * (interestRate / 100) * durationMonths;
   const totalAmount = principal + totalInterest;
-  const installmentAmount = totalAmount / installments;
+  const installmentAmount = installments > 0 ? totalAmount / installments : 0;
 
   return {
     installments,
@@ -31,6 +31,108 @@ export function calculateLoanDetails(
     totalAmount: Math.round(totalAmount * 100) / 100,
     installmentAmount: Math.round(installmentAmount * 100) / 100,
   };
+}
+
+/**
+ * Calculates the exact first payment due date based on the grant/start date.
+ * Rule: For a loan granted on aug 23, 2026:
+ * - Weekly: first payment is 7 days later (August 30, 2026)
+ * - Biweekly: first payment is 14 days later (September 6, 2026)
+ * - Monthly: first payment is 1 month later (September 23, 2026)
+ */
+export function getFirstPaymentDate(
+  startDate: string | Date, 
+  frequency: PaymentFrequency
+): Date {
+  const startMidnight = getPhilippineMidnightDate(startDate);
+  if (frequency === 'Weekly') {
+    return addDays(startMidnight, 7);
+  } else if (frequency === 'Biweekly') {
+    return addDays(startMidnight, 14);
+  } else {
+    return addMonths(startMidnight, 1);
+  }
+}
+
+/**
+ * Calculates the due date for a specific installment number (1-based index).
+ */
+export function getInstallmentDueDate(
+  startDate: string | Date,
+  frequency: PaymentFrequency,
+  installmentNumber: number // 1, 2, 3...
+): Date {
+  const startMidnight = getPhilippineMidnightDate(startDate);
+  if (frequency === 'Weekly') {
+    return addDays(startMidnight, installmentNumber * 7);
+  } else if (frequency === 'Biweekly') {
+    return addDays(startMidnight, installmentNumber * 14);
+  } else {
+    return addMonths(startMidnight, installmentNumber);
+  }
+}
+
+/**
+ * Calculates the final maturity date (the due date of the final installment).
+ */
+export function getMaturityDate(
+  startDate: string | Date,
+  durationMonths: number,
+  frequency: PaymentFrequency
+): Date {
+  const { installments } = calculateLoanDetails(1000, 5, durationMonths || 1, frequency);
+  return getInstallmentDueDate(startDate, frequency, installments);
+}
+
+export interface InstallmentScheduleItem {
+  installmentNumber: number;
+  dueDate: Date;
+  installmentAmount: number;
+  principalPortion: number;
+  interestPortion: number;
+  remainingBalance: number;
+}
+
+/**
+ * Generates the complete itemized schedule of installment payments.
+ */
+export function getAmortizationSchedule(
+  principal: number,
+  interestRate: number,
+  durationMonths: number,
+  frequency: PaymentFrequency,
+  startDate: string | Date
+): InstallmentScheduleItem[] {
+  const { installments, totalInterest, totalAmount, installmentAmount } = calculateLoanDetails(
+    principal,
+    interestRate,
+    durationMonths,
+    frequency
+  );
+
+  if (installments <= 0) return [];
+
+  const principalPerInstallment = principal / installments;
+  const interestPerInstallment = totalInterest / installments;
+
+  const schedule: InstallmentScheduleItem[] = [];
+  let runningBalance = totalAmount;
+
+  for (let i = 1; i <= installments; i++) {
+    const dueDate = getInstallmentDueDate(startDate, frequency, i);
+    runningBalance = Math.max(0, runningBalance - installmentAmount);
+
+    schedule.push({
+      installmentNumber: i,
+      dueDate,
+      installmentAmount: Math.round(installmentAmount * 100) / 100,
+      principalPortion: Math.round(principalPerInstallment * 100) / 100,
+      interestPortion: Math.round(interestPerInstallment * 100) / 100,
+      remainingBalance: Math.round(runningBalance * 100) / 100,
+    });
+  }
+
+  return schedule;
 }
 
 export function getActiveLoanPayments(loanId: string, payments: Payment[]): Payment[] {

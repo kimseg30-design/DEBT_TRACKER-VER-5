@@ -3,17 +3,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useStorage } from '../lib/storage';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { toast } from 'sonner';
-import { calculateLoanDetails } from '../lib/calculations';
-import { getPhilippineYMD } from '../lib/phtDate';
-import { LoanType, LoanGroup, PaymentFrequency } from '../types';
-import { ChevronLeft, Save, Calculator } from 'lucide-react';
+import { calculateLoanDetails, getFirstPaymentDate, getMaturityDate } from '../lib/calculations';
+import { getPhilippineYMD, formatPHTDate } from '../lib/phtDate';
+import { LoanType, LoanGroup, PaymentFrequency, Loan } from '../types';
+import { ChevronLeft, Save, Calculator, FileText, Printer, CalendarClock } from 'lucide-react';
+import LoanDocumentsModal from './LoanDocumentsModal';
 
 const loanSchema = z.object({
   borrowerName: z.string().min(2, 'Name is too short'),
@@ -37,6 +38,9 @@ export default function LoanForm() {
   const { loans, addLoan, updateLoan } = useStorage();
   
   const existingLoan = id ? loans.find(l => l.id === id) : null;
+  const [savedLoanForModal, setSavedLoanForModal] = useState<Loan | null>(null);
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [isJustSaved, setIsJustSaved] = useState(false);
 
   const form = useForm<LoanFormValues>({
     resolver: zodResolver(loanSchema),
@@ -103,17 +107,89 @@ export default function LoanForm() {
     };
 
     try {
-      if (id) {
+      let resultLoan: Loan;
+      if (id && existingLoan) {
         await updateLoan(id, loanData);
+        resultLoan = { ...existingLoan, ...loanData, updatedAt: new Date().toISOString() };
         toast.success('Loan updated successfully');
       } else {
-        await addLoan(loanData);
+        resultLoan = await addLoan(loanData);
         toast.success('Loan added successfully');
       }
-      navigate('/loans');
+      setSavedLoanForModal(resultLoan);
+      setIsJustSaved(true);
+      setIsDocModalOpen(true);
     } catch (error) {
       toast.error('Failed to save loan');
       console.error(error);
+    }
+  };
+
+  const handlePreviewDocuments = () => {
+    const values = form.getValues();
+    if (!values.borrowerName) {
+      toast.error('Please enter borrower name to preview documents');
+      return;
+    }
+    const { totalInterest, totalAmount, installmentAmount, installments } = calculateLoanDetails(
+      values.principal || 1000,
+      values.interestRate || 5,
+      values.durationMonths || 1,
+      values.frequency || 'Weekly'
+    );
+
+    const tempLoan: Loan = {
+      id: existingLoan?.id || 'PREVIEW-TEMP',
+      borrowerName: values.borrowerName,
+      principal: values.principal || 1000,
+      interestRate: values.interestRate || 5,
+      durationMonths: values.durationMonths || 1,
+      frequency: values.frequency || 'Weekly',
+      installments,
+      loanType: values.loanType || 'New',
+      loanGroup: values.loanGroup || '1st',
+      startDate: values.startDate ? new Date(values.startDate).toISOString() : new Date().toISOString(),
+      latePenalty: {
+        rate: values.latePenaltyRate || 2,
+        gracePeriod: values.latePenaltyGrace || 3,
+      },
+      notes: values.notes || '',
+      status: existingLoan ? existingLoan.status : 'Unpaid',
+      totalAmount,
+      totalInterest,
+      installmentAmount,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setSavedLoanForModal(tempLoan);
+    setIsJustSaved(false);
+    setIsDocModalOpen(true);
+  };
+
+  const handleAddAnother = () => {
+    setIsDocModalOpen(false);
+    setSavedLoanForModal(null);
+    setIsJustSaved(false);
+    form.reset({
+      borrowerName: '',
+      principal: 1000,
+      interestRate: 5,
+      frequency: 'Weekly',
+      durationMonths: 2,
+      loanType: 'New',
+      loanGroup: '1st',
+      startDate: getPhilippineYMD(),
+      latePenaltyRate: 2,
+      latePenaltyGrace: 3,
+      notes: '',
+    });
+  };
+
+  const handleCloseModal = () => {
+    setIsDocModalOpen(false);
+    if (isJustSaved) {
+      navigate('/loans');
     }
   };
 
@@ -121,8 +197,11 @@ export default function LoanForm() {
   const interestRate = form.watch('interestRate');
   const durationMonths = form.watch('durationMonths');
   const frequency = form.watch('frequency');
+  const startDate = form.watch('startDate');
 
   const preview = calculateLoanDetails(principal || 0, interestRate || 0, durationMonths || 0, frequency);
+  const previewFirstPaymentDate = getFirstPaymentDate(startDate || getPhilippineYMD(), frequency);
+  const previewMaturityDate = getMaturityDate(startDate || getPhilippineYMD(), durationMonths || 1, frequency);
 
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
@@ -132,7 +211,7 @@ export default function LoanForm() {
         </Button>
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white neon-text">{id ? 'Edit Loan' : 'Add New Loan'}</h2>
-          <p className="text-zinc-300">Configure loan terms and borrower details.</p>
+          <p className="text-zinc-300">Configure loan terms, generate official promissory notes and disclosure forms.</p>
         </div>
       </div>
 
@@ -149,7 +228,7 @@ export default function LoanForm() {
                   id="borrowerName" 
                   {...form.register('borrowerName')} 
                   className="bg-background border-primary/10 text-white focus:border-primary/50 transition-all"
-                  placeholder="Full Name"
+                  placeholder="Full Name (e.g., Juan Dela Cruz)"
                 />
                 {form.formState.errors.borrowerName && <p className="text-xs text-destructive">{form.formState.errors.borrowerName.message}</p>}
               </div>
@@ -252,6 +331,16 @@ export default function LoanForm() {
                   className="bg-background border-primary/10 text-white focus:border-primary/50"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes" className="text-zinc-300">Notes / Remarks (Optional)</Label>
+                <Input 
+                  id="notes" 
+                  {...form.register('notes')} 
+                  className="bg-background border-primary/10 text-white focus:border-primary/50"
+                  placeholder="e.g. Co-maker info, business purpose"
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -305,16 +394,65 @@ export default function LoanForm() {
                 <p className="text-xl font-bold text-accent neon-text">₱{preview.installmentAmount.toLocaleString()}</p>
               </div>
 
-              <div className="pt-6 border-t border-primary/10">
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/80 text-primary-foreground h-12 shadow-[0_0_15px_rgba(var(--primary),0.3)]">
+              <div className="pt-2 pb-2 border-t border-zinc-800 space-y-2.5 text-xs">
+                <div className="flex justify-between items-center text-zinc-300">
+                  <span>Date Granted:</span>
+                  <span className="font-semibold text-white">{formatPHTDate(startDate || getPhilippineYMD())}</span>
+                </div>
+                <div className="flex justify-between items-center bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg">
+                  <span className="font-bold text-amber-300">1st Payment Due:</span>
+                  <span className="font-bold text-amber-200 font-mono">{formatPHTDate(previewFirstPaymentDate)}</span>
+                </div>
+                <div className="flex justify-between items-center text-zinc-300">
+                  <span>Maturity Date:</span>
+                  <span className="font-semibold text-white">{formatPHTDate(previewMaturityDate)}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 pb-2 border-t border-zinc-800 space-y-2.5 text-xs">
+                <div className="flex justify-between items-center text-zinc-300">
+                  <span>Date Granted:</span>
+                  <span className="font-semibold text-white">{formatPHTDate(startDate || getPhilippineYMD())}</span>
+                </div>
+                <div className="flex justify-between items-center bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg">
+                  <span className="font-bold text-amber-300">1st Payment Due:</span>
+                  <span className="font-bold text-amber-200 font-mono">{formatPHTDate(previewFirstPaymentDate)}</span>
+                </div>
+                <div className="flex justify-between items-center text-zinc-300">
+                  <span>Maturity Date:</span>
+                  <span className="font-semibold text-white">{formatPHTDate(previewMaturityDate)}</span>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-primary/10 space-y-3">
+                <Button type="submit" className="w-full bg-primary hover:bg-primary/80 text-primary-foreground h-12 shadow-[0_0_15px_rgba(var(--primary),0.3)] font-semibold">
                   <Save className="h-5 w-5 mr-2" />
-                  {id ? 'Update Loan' : 'Save Loan'}
+                  {id ? 'Update & Generate Papers' : 'Save Loan & Generate Papers'}
+                </Button>
+
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={handlePreviewDocuments}
+                  className="w-full border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs h-10 gap-1.5"
+                >
+                  <FileText className="h-4 w-4 text-secondary" />
+                  <span>Preview Documents</span>
                 </Button>
               </div>
             </CardContent>
           </Card>
         </div>
       </form>
+
+      {/* Official Loan Documents Modal (Loan Paper, Disclosure Statement, Promissory Note) */}
+      <LoanDocumentsModal
+        loan={savedLoanForModal}
+        isOpen={isDocModalOpen}
+        onClose={handleCloseModal}
+        isJustCreated={isJustSaved}
+        onAddAnother={handleAddAnother}
+      />
     </div>
   );
 }
