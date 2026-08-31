@@ -46,6 +46,17 @@ export default function LoanDocumentsModal({
   const [activeTab, setActiveTab] = useState<DocumentTab>('all');
   const printContainerRef = useRef<HTMLDivElement>(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('loan-documents-modal-active');
+    } else {
+      document.body.classList.remove('loan-documents-modal-active');
+    }
+    return () => {
+      document.body.classList.remove('loan-documents-modal-active');
+    };
+  }, [isOpen]);
+
   if (!loan) return null;
 
   const {
@@ -265,13 +276,19 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               }
 
               /* When loan documents modal is active, hide everything else */
+              body.loan-documents-modal-active #root,
               body:has([data-slot="dialog-content"]) #root {
                 display: none !important;
+                visibility: hidden !important;
+                height: 0 !important;
+                max-height: 0 !important;
+                overflow: hidden !important;
               }
 
               /* Hide UI navigation, backdrops, and buttons */
-              nav, header, aside, main, button, [data-slot="dialog-overlay"], [data-slot="dialog-close"], .print\\:hidden, .no-print {
+              nav, header, aside, main, footer, button, [data-slot="dialog-overlay"], [data-slot="dialog-close"], .print\\:hidden, .no-print {
                 display: none !important;
+                visibility: hidden !important;
               }
 
               /* Base-UI Dialog Reset to allow full multipage rendering */
