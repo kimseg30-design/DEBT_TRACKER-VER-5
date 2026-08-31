@@ -22,7 +22,8 @@ import {
   Layers,
   Calendar,
   Check,
-  Eye
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -99,6 +100,157 @@ export default function LoanDocumentsModal({
     }
   };
 
+  const handleOpenInNewWindow = () => {
+    const printWindow = window.open('', '_blank', 'width=950,height=900,menubar=no,toolbar=no,location=no,status=no');
+    if (!printWindow) {
+      toast.error('Pop-up window blocked. Please allow popups for DebtFlow to preview documents in a new window.');
+      return;
+    }
+
+    const docContent = printContainerRef.current ? printContainerRef.current.innerHTML : '';
+    const title = `DebtFlow Loan Documents - ${borrowerName} (${formattedRefId})`;
+
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <title>${title}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @page {
+              size: auto;
+              margin: 8mm 10mm 8mm 10mm;
+            }
+            *, *::before, *::after {
+              box-sizing: border-box;
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              background-color: #09090b;
+              color: #000000;
+              margin: 0;
+              padding: 0;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .window-toolbar {
+              position: sticky;
+              top: 0;
+              z-index: 50;
+              background: #18181b;
+              color: #ffffff;
+              padding: 12px 20px;
+              border-bottom: 1px solid #27272a;
+              display: flex;
+              align-items: center;
+              justify-between;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            }
+            .window-container {
+              max-width: 900px;
+              margin: 24px auto;
+              padding: 0 16px;
+            }
+            .print-page-1,
+            .print-page-2,
+            .print-page-3 {
+              background: #ffffff !important;
+              color: #09090b !important;
+              border: 1.5px solid #0f172a !important;
+              border-radius: 8px !important;
+              box-shadow: 0 10px 25px rgba(0,0,0,0.3) !important;
+              padding: 18px 22px !important;
+              margin: 0 auto 32px auto !important;
+              width: 100% !important;
+              max-width: 820px !important;
+              box-sizing: border-box !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+            @media print {
+              body {
+                background: #ffffff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              .window-toolbar, .no-print, .print\\:hidden {
+                display: none !important;
+              }
+              .window-container {
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              .print-page-1,
+              .print-page-2,
+              .print-page-3 {
+                border: 1.5px solid #0f172a !important;
+                border-radius: 0px !important;
+                box-shadow: none !important;
+                padding: 12px 16px !important;
+                margin: 0 auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              .print-page-1 {
+                page-break-after: always !important;
+                break-after: page !important;
+              }
+              .print-page-2 {
+                page-break-before: always !important;
+                break-before: page !important;
+                page-break-after: always !important;
+                break-after: page !important;
+              }
+              .print-page-3 {
+                page-break-before: always !important;
+                break-before: page !important;
+                page-break-after: auto !important;
+                break-after: auto !important;
+              }
+              .single-doc-mode .print-page-1,
+              .single-doc-mode .print-page-2,
+              .single-doc-mode .print-page-3 {
+                page-break-before: auto !important;
+                break-before: auto !important;
+                page-break-after: auto !important;
+                break-after: auto !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="window-toolbar">
+            <div>
+              <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                <span>Official Loan Documents Preview</span>
+                <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-family: monospace;">${formattedRefId}</span>
+              </div>
+              <div style="font-size: 12px; color: #a1a1aa;">Borrower: <strong>${borrowerName}</strong> &bull; Auto-scaled for Letter / A4 / Legal / Long</div>
+            </div>
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+              <button onclick="window.close()" style="background: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer;">Close Preview</button>
+              <button onclick="window.print()" style="background: #10b981; color: #ffffff; border: none; padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                Print Documents Now
+              </button>
+            </div>
+          </div>
+          <div class="window-container">
+            ${docContent}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    toast.success('Documents loaded in dedicated preview window!');
+  };
+
   const handleCopySummary = () => {
     const summaryText = `
 DEBTFLOW OFFICIAL LOAN DOCUMENTS
@@ -143,6 +295,16 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenInNewWindow}
+              className="border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-xs h-9"
+              title="Open full documents in a new dedicated window to review before printing"
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5 text-primary" />
+              Open in New Window
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -250,19 +412,19 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
           ref={printContainerRef}
           className="print-canvas flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 bg-zinc-950 print:bg-white print:text-black print:p-0 print:m-0 print:space-y-0 print:overflow-visible print:w-full"
         >
-          {/* Universal Print Stylesheet tailored for exact page separation */}
+          {/* Universal Print Stylesheet tailored for exact page separation & auto paper sizing */}
           <style>{`
             @page {
               size: auto;
-              margin: 8mm 10mm 8mm 10mm;
+              margin: 7mm 9mm 7mm 9mm;
             }
             @media print {
               html, body, #root {
                 background: #ffffff !important;
                 background-image: none !important;
                 color: #000000 !important;
-                font-size: 9.5pt !important;
-                line-height: 1.25 !important;
+                font-size: 9pt !important;
+                line-height: 1.2 !important;
                 width: 100% !important;
                 height: auto !important;
                 min-height: auto !important;
@@ -329,7 +491,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                 display: block !important;
               }
 
-              /* Individual Document Page Containers */
+              /* Individual Document Page Containers - Scaled to automatically fit Letter, A4, Legal, Long */
               .print-page-1,
               .print-page-2,
               .print-page-3 {
@@ -338,13 +500,14 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                 border: 1.5px solid #0f172a !important;
                 border-radius: 0px !important;
                 box-shadow: none !important;
-                padding: 14px 18px !important;
+                padding: 12px 16px !important;
                 margin: 0 auto !important;
                 width: 100% !important;
                 max-width: 100% !important;
                 box-sizing: border-box !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
+                max-height: 98vh !important;
               }
 
               /* Exact Page Transitions */
@@ -396,25 +559,25 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               }
 
               th, td {
-                padding: 3px 5px !important;
+                padding: 2.5px 4.5px !important;
               }
 
               .print-heading {
-                font-size: 13pt !important;
+                font-size: 12.5pt !important;
                 line-height: 1.15 !important;
               }
 
               .print-subheading {
-                font-size: 8pt !important;
+                font-size: 7.5pt !important;
               }
 
               .print-body-text {
-                font-size: 8pt !important;
-                line-height: 1.25 !important;
+                font-size: 7.5pt !important;
+                line-height: 1.2 !important;
               }
 
               .print-table-text {
-                font-size: 8pt !important;
+                font-size: 7.5pt !important;
               }
 
               .bg-zinc-50, .bg-zinc-100 {
