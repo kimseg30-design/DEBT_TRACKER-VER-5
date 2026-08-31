@@ -243,15 +243,15 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
           <style>{`
             @page {
               size: auto;
-              margin: 10mm 12mm 10mm 12mm;
+              margin: 8mm 10mm 8mm 10mm;
             }
             @media print {
               html, body, #root {
                 background: #ffffff !important;
                 background-image: none !important;
                 color: #000000 !important;
-                font-size: 10pt !important;
-                line-height: 1.3 !important;
+                font-size: 9.5pt !important;
+                line-height: 1.25 !important;
                 width: 100% !important;
                 height: auto !important;
                 min-height: auto !important;
@@ -264,8 +264,13 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                 print-color-adjust: exact !important;
               }
 
+              /* When loan documents modal is active, hide everything else */
+              body:has([data-slot="dialog-content"]) #root {
+                display: none !important;
+              }
+
               /* Hide UI navigation, backdrops, and buttons */
-              nav, header, aside, button, [data-slot="dialog-overlay"], [data-slot="dialog-close"], .print\\:hidden, .no-print {
+              nav, header, aside, main, button, [data-slot="dialog-overlay"], [data-slot="dialog-close"], .print\\:hidden, .no-print {
                 display: none !important;
               }
 
@@ -316,7 +321,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                 border: 1.5px solid #0f172a !important;
                 border-radius: 0px !important;
                 box-shadow: none !important;
-                padding: 18px 22px !important;
+                padding: 14px 18px !important;
                 margin: 0 auto !important;
                 width: 100% !important;
                 max-width: 100% !important;
@@ -374,25 +379,25 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               }
 
               th, td {
-                padding: 3.5px 5px !important;
+                padding: 3px 5px !important;
               }
 
               .print-heading {
-                font-size: 14pt !important;
-                line-height: 1.2 !important;
+                font-size: 13pt !important;
+                line-height: 1.15 !important;
               }
 
               .print-subheading {
-                font-size: 8.5pt !important;
+                font-size: 8pt !important;
               }
 
               .print-body-text {
-                font-size: 8.5pt !important;
-                line-height: 1.3 !important;
+                font-size: 8pt !important;
+                line-height: 1.25 !important;
               }
 
               .print-table-text {
-                font-size: 8.5pt !important;
+                font-size: 8pt !important;
               }
 
               .bg-zinc-50, .bg-zinc-100 {

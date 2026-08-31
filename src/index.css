@@ -125,12 +125,61 @@
 @media print {
   @page {
     size: auto;
-    margin: 10mm 12mm;
+    margin: 8mm 12mm 8mm 12mm;
   }
   
-  html, body {
+  html, body, #root {
     background: #ffffff !important;
     background-image: none !important;
     color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* When an official document modal is open, hide the rest of the app hierarchy */
+  body:has([data-slot="dialog-content"]) #root {
+    display: none !important;
+  }
+
+  /* Hide background elements and navigation */
+  aside, nav, header, main, [data-slot="dialog-overlay"], [data-slot="dialog-close"], .print\:hidden, .no-print {
+    display: none !important;
+  }
+
+  /* Base-UI Dialog Reset to allow full multipage rendering */
+  [data-slot="dialog-portal"] {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  [data-slot="dialog-content"] {
+    position: static !important;
+    transform: none !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+    display: block !important;
   }
 }
