@@ -12,6 +12,7 @@ import { Loan } from '../types';
 import { formatPHTDate } from '../lib/phtDate';
 import { calculateLoanDetails, getFirstPaymentDate, getMaturityDate, getAmortizationSchedule } from '../lib/calculations';
 import { numberToWords } from '../lib/numberToWords';
+import { useStorage } from '../lib/storage';
 import { 
   Printer, 
   FileText, 
@@ -43,6 +44,7 @@ export default function LoanDocumentsModal({
   isJustCreated = false,
   onAddAnother,
 }: LoanDocumentsModalProps) {
+  const { appSettings } = useStorage();
   const [activeTab, setActiveTab] = useState<DocumentTab>('all');
   const [isPrinting, setIsPrinting] = useState(false);
   const printContainerRef = useRef<HTMLDivElement>(null);
@@ -76,7 +78,7 @@ export default function LoanDocumentsModal({
 
   const principalWords = numberToWords(principal);
   const totalAmountWords = numberToWords(calc.totalAmount);
-  const formattedRefId = `DF-${id.slice(0, 8).toUpperCase()}`;
+  const formattedRefId = `LN-${id.slice(0, 8).toUpperCase()}`;
 
   // Generate self-contained standalone HTML for pristine direct printing / export
   const generatePrintHTML = () => {
@@ -87,11 +89,11 @@ export default function LoanDocumentsModal({
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>DebtFlow_Loan_Documents_${formattedRefId}_${borrowerName.replace(/\s+/g, '_')}</title>
+  <title>${appSettings.appName.replace(/\s+/g, '_')}_Loan_Documents_${formattedRefId}_${borrowerName.replace(/\s+/g, '_')}</title>
   <style>
     @page {
       size: portrait;
-      margin: 12mm 12mm 15mm 12mm;
+      margin: 10mm 12mm 12mm 12mm;
     }
     *, *::before, *::after {
       box-sizing: border-box;
@@ -102,10 +104,11 @@ export default function LoanDocumentsModal({
       background: #ffffff !important;
       color: #09090b !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 10pt;
+      font-size: 9.5pt;
       line-height: 1.45;
-      padding: 0;
-      margin: 0;
+      padding: 10px;
+      margin: 0 auto;
+      max-width: 800px;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -113,8 +116,8 @@ export default function LoanDocumentsModal({
       background: #ffffff;
       color: #09090b;
       border: 1.5px solid #18181b;
-      border-radius: 4px;
-      padding: 22px 26px;
+      border-radius: 6px;
+      padding: 24px 28px;
       margin-bottom: 24px;
       width: 100%;
       page-break-after: always;
@@ -126,7 +129,7 @@ export default function LoanDocumentsModal({
       break-after: auto;
       margin-bottom: 0;
     }
-    .space-y-6 > * + * { margin-top: 18px; }
+    .space-y-6 > * + * { margin-top: 16px; }
     .space-y-4 > * + * { margin-top: 12px; }
     .space-y-3 > * + * { margin-top: 10px; }
     .space-y-2 > * + * { margin-top: 8px; }
@@ -135,7 +138,7 @@ export default function LoanDocumentsModal({
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 9pt;
+      font-size: 8.5pt;
       margin-top: 4px;
     }
     thead {
@@ -146,7 +149,7 @@ export default function LoanDocumentsModal({
       break-inside: avoid;
     }
     th, td {
-      padding: 5px 8px;
+      padding: 4.5px 7px;
       border: 1px solid #d4d4d8;
       text-align: left;
     }
@@ -157,6 +160,7 @@ export default function LoanDocumentsModal({
     .bg-zinc-50 { background-color: #fafafa; }
     .bg-zinc-100 { background-color: #f4f4f5; }
     .bg-amber-50 { background-color: #fffbeb; }
+    .bg-emerald-50 { background-color: #ecfdf5; }
     .text-right { text-align: right; }
     .text-center { text-align: center; }
     .font-bold { font-weight: 700; }
@@ -165,13 +169,13 @@ export default function LoanDocumentsModal({
     .uppercase { text-transform: uppercase; }
     .border-b-2 { border-bottom: 2px solid #18181b; }
     .border-t { border-top: 1px solid #d4d4d8; }
-    .grid { display: flex; gap: 16px; }
+    .grid { display: flex; gap: 14px; }
     .grid > div { flex: 1; }
     .print-avoid-break {
       page-break-inside: avoid;
       break-inside: avoid;
     }
-    .no-print, style { display: none !important; }
+    .no-print, button, .print\\:hidden { display: none !important; }
     .overflow-y-auto, .max-h-56 {
       max-height: none !important;
       overflow: visible !important;
@@ -184,25 +188,27 @@ export default function LoanDocumentsModal({
 </html>`;
   };
 
-  // High-reliability isolated print method using a clean hidden iframe
+  // High-reliability isolated print method
   const handlePrint = () => {
     setIsPrinting(true);
     try {
-      // Create a hidden iframe for isolated print
-      const existingIframe = document.getElementById('debtflow-print-frame');
+      // 1. First try creating printable iframe with full content
+      const existingIframe = document.getElementById('app-print-frame');
       if (existingIframe) {
         existingIframe.remove();
       }
 
       const iframe = document.createElement('iframe');
-      iframe.id = 'debtflow-print-frame';
+      iframe.id = 'app-print-frame';
       iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
+      iframe.style.left = '0';
+      iframe.style.top = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
       iframe.style.border = '0';
-      iframe.style.visibility = 'hidden';
+      iframe.style.zIndex = '999999';
+      iframe.style.background = '#ffffff';
+      iframe.style.opacity = '0.01'; // Kept attached to DOM for full layout calculation
       document.body.appendChild(iframe);
 
       const printHtml = generatePrintHTML();
@@ -213,18 +219,21 @@ export default function LoanDocumentsModal({
         iframeDoc.write(printHtml);
         iframeDoc.close();
 
-        // Give browser time to parse CSS and render
         setTimeout(() => {
           try {
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
             setIsPrinting(false);
+            setTimeout(() => {
+              iframe.remove();
+            }, 1500);
           } catch (e) {
             console.warn('Iframe print fallback to window.print', e);
             window.print();
             setIsPrinting(false);
+            iframe.remove();
           }
-        }, 300);
+        }, 350);
       } else {
         window.print();
         setIsPrinting(false);
@@ -246,13 +255,13 @@ export default function LoanDocumentsModal({
       printWindow.document.close();
       toast.success('Clean document view opened in a new tab');
     } else {
-      toast.info('Popup blocked. Use the Print button directly.');
+      toast.info('Popup blocked. Click "Print Documents" directly.');
     }
   };
 
   const handleCopySummary = () => {
     const summaryText = `
-DEBTFLOW LOAN SUMMARY
+${appSettings.businessName.toUpperCase()} - LOAN SUMMARY
 Ref ID: ${formattedRefId}
 Borrower: ${borrowerName}
 Principal: ₱${principal.toLocaleString()} (${principalWords})
@@ -265,6 +274,7 @@ Date Granted: ${formatPHTDate(startDate)}
 First Payment Due: ${formatPHTDate(firstPaymentDate)}
 Maturity Date: ${formatPHTDate(maturityDate)}
 Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace period.
+Officer: ${appSettings.officerTitle}
     `.trim();
 
     navigator.clipboard.writeText(summaryText);
@@ -408,7 +418,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
           <div className="flex items-center gap-2 text-[11px] text-zinc-400 shrink-0">
             <span className="inline-flex items-center gap-1 bg-zinc-900 border border-zinc-800 px-2 py-1 rounded text-zinc-300">
               <Sparkles className="h-3 w-3 text-primary" />
-              <span>Auto-fit to Pages • No Scrollbars</span>
+              <span>Auto-fit to Pages • Formatted for A4 / Letter</span>
             </span>
           </div>
         </div>
@@ -430,7 +440,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                   Loan Agreement & Contract
                 </h1>
                 <p className="text-[11px] font-semibold text-zinc-600 uppercase tracking-wider">
-                  DebtFlow Credit & Financial Services
+                  {appSettings.businessName} • {appSettings.tagline}
                 </p>
                 <div className="flex justify-between items-center text-[10px] text-zinc-600 pt-2 font-mono">
                   <span>LOAN REF: <strong>{formattedRefId}</strong></span>
@@ -448,8 +458,11 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-50 p-4 rounded-lg border border-zinc-300 text-xs">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-zinc-500 block">LENDER / CREDITOR:</span>
-                    <strong className="text-zinc-900 text-sm">DebtFlow Financial Services</strong>
-                    <p className="text-zinc-600 text-[11px]">Authorized Lending Representative</p>
+                    <strong className="text-zinc-900 text-sm">{appSettings.businessName}</strong>
+                    <p className="text-zinc-600 text-[11px]">{appSettings.officerTitle}</p>
+                    {appSettings.contactInfo && (
+                      <p className="text-zinc-500 text-[10px]">{appSettings.contactInfo}</p>
+                    )}
                   </div>
                   <div>
                     <span className="text-[10px] uppercase font-bold text-zinc-500 block">BORROWER / DEBTOR:</span>
@@ -620,8 +633,8 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
 
                   <div className="text-center space-y-1">
                     <div className="border-b-2 border-zinc-900 h-12 w-48 sm:w-64 mx-auto"></div>
-                    <p className="font-bold text-zinc-950 uppercase text-xs">AUTHORIZED REPRESENTATIVE</p>
-                    <p className="text-[10px] text-zinc-600">DebtFlow Loan Officer / Creditor</p>
+                    <p className="font-bold text-zinc-950 uppercase text-xs">{appSettings.officerTitle.toUpperCase()}</p>
+                    <p className="text-[10px] text-zinc-600">{appSettings.businessName} / Creditor</p>
                     <p className="text-[10px] text-zinc-500">Date: ________________________</p>
                   </div>
                 </div>
@@ -645,7 +658,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                   Disclosure Statement on Loan/Credit Transaction
                 </h1>
                 <p className="text-[11px] font-semibold text-zinc-600 uppercase tracking-wider">
-                  (In Compliance with Republic Act No. 3765 - Truth in Lending Act)
+                  {appSettings.businessName} • (In Compliance with RA 3765 - Truth in Lending Act)
                 </p>
                 <div className="flex justify-between items-center text-[10px] text-zinc-600 pt-2 font-mono">
                   <span>STATEMENT NO: <strong>DS-{formattedRefId}</strong></span>
@@ -772,8 +785,8 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
 
                   <div className="text-center space-y-1">
                     <div className="border-b-2 border-zinc-900 h-12 w-48 sm:w-64 mx-auto"></div>
-                    <p className="font-bold text-zinc-950 uppercase text-xs">CREDIT OFFICER / WITNESS</p>
-                    <p className="text-[10px] text-zinc-600">DebtFlow Lending Operations</p>
+                    <p className="font-bold text-zinc-950 uppercase text-xs">{appSettings.officerTitle.toUpperCase()}</p>
+                    <p className="text-[10px] text-zinc-600">{appSettings.businessName}</p>
                     <p className="text-[10px] text-zinc-500">Date: ________________________</p>
                   </div>
                 </div>
@@ -792,7 +805,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                   Promissory Note
                 </h1>
                 <p className="text-[11px] font-semibold text-zinc-600 uppercase tracking-wider">
-                  (Katibayan ng Pagkakautang at Pangakong Pagbabayad)
+                  {appSettings.businessName} • (Katibayan ng Pagkakautang at Pangakong Pagbabayad)
                 </p>
                 <div className="flex justify-between items-center text-[10px] text-zinc-600 pt-2 font-mono">
                   <span>NOTE NO: <strong>PN-{formattedRefId}</strong></span>
@@ -806,7 +819,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                 <p>
                   <strong>FOR VALUE RECEIVED</strong>, the undersigned (the <strong>"Maker / Borrower"</strong>),{' '}
                   <strong className="text-zinc-950 uppercase">{borrowerName}</strong>, hereby unconditionally promises to pay to the order of{' '}
-                  <strong className="text-zinc-950">DebtFlow Financial Services / Assigns</strong> (the <strong>"Holder"</strong>), the total sum of{' '}
+                  <strong className="text-zinc-950">{appSettings.businessName} / Assigns</strong> (the <strong>"Holder"</strong>), the total sum of{' '}
                   <strong className="text-zinc-950 underline">{totalAmountWords}</strong> (<strong>₱{calc.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>), representing the principal loan amount of{' '}
                   <strong>₱{principal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> plus monthly nominal interest at the rate of{' '}
                   <strong>{interestRate}%</strong> per month.
@@ -853,7 +866,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
 
                 <div className="pt-4 text-center">
                   <div className="border-b border-zinc-400 h-10 w-48 sm:w-64 mx-auto"></div>
-                  <p className="text-[10px] text-zinc-600 mt-1">Authorized Witness / Loan Officer Signature</p>
+                  <p className="text-[10px] text-zinc-600 mt-1">{appSettings.officerTitle} / Authorized Witness</p>
                 </div>
               </div>
             </div>

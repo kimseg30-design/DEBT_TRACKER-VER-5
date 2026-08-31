@@ -43,7 +43,7 @@ interface SidebarProps {
 }
 
 function Sidebar({ isOpen, setIsOpen, onOpenInstall }: SidebarProps) {
-  const { user, login, handleLogout, storageType } = useStorage();
+  const { user, login, handleLogout, storageType, appSettings } = useStorage();
   const location = useLocation();
 
   const navItems = [
@@ -68,7 +68,10 @@ function Sidebar({ isOpen, setIsOpen, onOpenInstall }: SidebarProps) {
               <div className="p-2 bg-primary rounded-lg shadow-[0_0_15px_rgba(var(--primary),0.5)]">
                 <Wallet className="h-6 w-6 text-primary-foreground" />
               </div>
-              <h1 className="text-xl font-bold tracking-tight text-white neon-text">DebtFlow</h1>
+              <div className="flex flex-col min-w-0">
+                <h1 className="text-xl font-bold tracking-tight text-white neon-text truncate">{appSettings.appName}</h1>
+                <span className="text-[10px] text-zinc-400 truncate max-w-[140px]">{appSettings.tagline}</span>
+              </div>
             </div>
             <Button 
               variant="ghost" 
@@ -139,9 +142,15 @@ function Sidebar({ isOpen, setIsOpen, onOpenInstall }: SidebarProps) {
 }
 
 function AppContent() {
-  const { user } = useStorage();
+  const { user, appSettings } = useStorage();
   const [isOpen, setIsOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (appSettings?.appName) {
+      document.title = `${appSettings.appName} - Loan Management System`;
+    }
+  }, [appSettings?.appName]);
   
   if (!user) {
     return <Auth />;
@@ -151,11 +160,11 @@ function AppContent() {
     <div className="min-h-screen bg-black text-zinc-100 flex flex-col lg:flex-row">
       {/* Mobile Sticky Header */}
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-black/90 backdrop-blur-md border-b border-primary/10">
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 bg-primary rounded-lg shadow-[0_0_10px_rgba(var(--primary),0.4)]">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-1.5 bg-primary rounded-lg shadow-[0_0_10px_rgba(var(--primary),0.4)] shrink-0">
             <Wallet className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="text-lg font-bold text-white neon-text tracking-tight">DebtFlow</span>
+          <span className="text-lg font-bold text-white neon-text tracking-tight truncate">{appSettings.appName}</span>
         </div>
 
         <div className="flex items-center gap-2">

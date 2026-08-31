@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
+import { useStorage } from '../lib/storage';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -53,7 +54,7 @@ export function usePWAInstall() {
       setIsInstalled(true);
       setIsInstallable(false);
       setDeferredPrompt(null);
-      toast.success('DebtFlow has been installed successfully!');
+      toast.success('App has been installed successfully!');
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -70,7 +71,7 @@ export function usePWAInstall() {
       deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
       if (choice.outcome === 'accepted') {
-        toast.success('Downloading & installing DebtFlow app...');
+        toast.success('Downloading & installing app...');
       }
       setDeferredPrompt(null);
       setIsInstallable(false);
@@ -93,6 +94,7 @@ interface InstallAppModalProps {
 
 export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProps) {
   const { isInstallable, isInstalled, isIOS, triggerInstall, hasNativePrompt } = usePWAInstall();
+  const { appSettings } = useStorage();
   const [activeTab, setActiveTab] = useState<'mobile' | 'desktop'>('mobile');
 
   const handleInstallClick = async () => {
@@ -116,7 +118,7 @@ export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProp
             </div>
             <div>
               <DialogTitle className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                <span>Download DebtFlow App</span>
+                <span>Download {appSettings.appName} App</span>
                 <Badge variant="outline" className="bg-primary/10 border-primary/30 text-primary text-[10px]">
                   PWA App
                 </Badge>
@@ -135,7 +137,7 @@ export default function InstallAppModal({ isOpen, onClose }: InstallAppModalProp
             </div>
             <h3 className="font-bold text-lg text-white">App is Already Installed!</h3>
             <p className="text-xs text-zinc-400">
-              You are currently using DebtFlow in standalone mode on this device.
+              You are currently using {appSettings.appName} in standalone mode on this device.
             </p>
             <Button onClick={onClose} className="w-full mt-4">
               Close

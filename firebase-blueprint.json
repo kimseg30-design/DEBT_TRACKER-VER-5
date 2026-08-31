@@ -48,6 +48,21 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "loanId", "amount", "date", "uid"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Represents custom application branding and business settings",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string" },
+        "businessName": { "type": "string" },
+        "tagline": { "type": "string" },
+        "representativeName": { "type": "string" },
+        "representativeTitle": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "uid": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -58,6 +73,10 @@
     "/payments/{paymentId}": {
       "schema": "Payment",
       "description": "Collection of payments"
+    },
+    "/settings/{settingId}": {
+      "schema": "AppSettings",
+      "description": "Collection of user application branding settings"
     }
   }
 }

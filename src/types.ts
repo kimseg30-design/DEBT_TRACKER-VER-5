@@ -91,6 +91,26 @@ export interface UserProfile {
   photoURL?: string;
 }
 
+export interface AppSettings {
+  appName: string;
+  businessName: string;
+  tagline: string;
+  representativeName: string;
+  representativeTitle: string;
+  contactNumber?: string;
+  address?: string;
+}
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  appName: 'DebtFlow',
+  businessName: 'DebtFlow Credit & Financial Services',
+  tagline: 'Lending & Installment Management System',
+  representativeName: 'Authorized Lending Representative',
+  representativeTitle: 'DebtFlow Loan Officer / Creditor',
+  contactNumber: '',
+  address: '',
+};
+
 export type StorageType = 'local' | 'cloud';
 
 export interface AppState {
@@ -99,5 +119,6 @@ export interface AppState {
   members: Member[];
   contributions: Contribution[];
   auditLogs: AuditLog[];
+  settings?: AppSettings;
   storageType: StorageType;
 }

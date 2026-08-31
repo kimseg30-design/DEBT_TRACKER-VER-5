@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { Loan, Payment, StorageType, UserProfile, Member, Contribution, AuditLog, BalanceDeclaration } from '../types';
+import { Loan, Payment, StorageType, UserProfile, Member, Contribution, AuditLog, BalanceDeclaration, AppSettings, DEFAULT_APP_SETTINGS } from '../types';
 import { calculateLoanDetails } from './calculations';
 import { auth, db, collection, doc, setDoc, getDocs, query, where, onSnapshot, deleteDoc, updateDoc, signInWithGoogle, logout, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -11,6 +11,9 @@ interface StorageContextType {
   members: Member[];
   contributions: Contribution[];
   auditLogs: AuditLog[];
+  appSettings: AppSettings;
+  updateAppSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  resetAppSettings: () => Promise<void>;
   user: UserProfile | null;
   storageType: StorageType;
   setStorageType: (type: StorageType) => void;
@@ -42,6 +45,17 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [members, setMembers] = useState<Member[]>([]);
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [appSettings, setAppSettings] = useState<AppSettings>(() => {
+    const saved = localStorage.getItem('appSettings');
+    if (saved) {
+      try {
+        return { ...DEFAULT_APP_SETTINGS, ...JSON.parse(saved) };
+      } catch (e) {
+        return DEFAULT_APP_SETTINGS;
+      }
+    }
+    return DEFAULT_APP_SETTINGS;
+  });
   const [user, setUser] = useState<UserProfile | null>(() => {
     const local = localStorage.getItem('localUser');
     return local ? JSON.parse(local) : null;
@@ -85,12 +99,30 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setMembers(JSON.parse(localStorage.getItem('members') || '[]'));
       setContributions(JSON.parse(localStorage.getItem('contributions') || '[]'));
       setAuditLogs(JSON.parse(localStorage.getItem('auditLogs') || '[]'));
+      const savedSettings = localStorage.getItem('appSettings');
+      if (savedSettings) {
+        try {
+          setAppSettings({ ...DEFAULT_APP_SETTINGS, ...JSON.parse(savedSettings) });
+        } catch (e) {
+          // ignore
+        }
+      }
     } else if (storageType === 'cloud' && user && isAuthReady) {
       const loansQuery = query(collection(db, 'loans'), where('uid', '==', user.uid));
       const paymentsQuery = query(collection(db, 'payments'), where('uid', '==', user.uid));
       const membersQuery = query(collection(db, 'members'), where('uid', '==', user.uid));
       const contributionsQuery = query(collection(db, 'contributions'), where('uid', '==', user.uid));
       const auditLogsQuery = query(collection(db, 'auditLogs'), where('uid', '==', user.uid));
+
+      const unsubSettings = onSnapshot(doc(db, 'settings', user.uid), (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setAppSettings({ ...DEFAULT_APP_SETTINGS, ...data });
+          localStorage.setItem('appSettings', JSON.stringify({ ...DEFAULT_APP_SETTINGS, ...data }));
+        }
+      }, (error) => {
+        console.error("Settings sync error:", error);
+      });
 
       const unsubLoans = onSnapshot(loansQuery, (snapshot) => {
         setLoans(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Loan)));
@@ -124,6 +156,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       });
 
       return () => {
+        unsubSettings();
         unsubLoans();
         unsubPayments();
         unsubMembers();
@@ -502,8 +535,45 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setStorageType('local');
   };
 
+  const updateAppSettings = async (newSettings: Partial<AppSettings>) => {
+    const updated: AppSettings = { ...appSettings, ...newSettings };
+    setAppSettings(updated);
+    localStorage.setItem('appSettings', JSON.stringify(updated));
+
+    if (storageType === 'cloud' && user) {
+      try {
+        await setDoc(doc(db, 'settings', user.uid), { ...updated, uid: user.uid }, { merge: true });
+      } catch (e) {
+        console.error('Failed to sync app settings to cloud:', e);
+      }
+    }
+    await logAction('UPDATE_BRANDING', `Updated App Name to "${updated.appName}" and Business Name to "${updated.businessName}"`);
+  };
+
+  const resetAppSettings = async () => {
+    setAppSettings(DEFAULT_APP_SETTINGS);
+    localStorage.setItem('appSettings', JSON.stringify(DEFAULT_APP_SETTINGS));
+
+    if (storageType === 'cloud' && user) {
+      try {
+        await setDoc(doc(db, 'settings', user.uid), { ...DEFAULT_APP_SETTINGS, uid: user.uid });
+      } catch (e) {
+        console.error('Failed to reset app settings in cloud:', e);
+      }
+    }
+    await logAction('RESET_BRANDING', 'Reset app name and branding to default DebtFlow settings');
+  };
+
   const exportData = () => {
-    return JSON.stringify({ loans, payments, members, contributions, auditLogs }, null, 2);
+    return JSON.stringify({ 
+      loans, 
+      payments, 
+      members, 
+      contributions, 
+      auditLogs,
+      settings: appSettings,
+      exportedAt: new Date().toISOString()
+    }, null, 2);
   };
 
   const importData = (json: string) => {
@@ -516,6 +586,10 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setMembers(data.members || []);
           setContributions(data.contributions || []);
           setAuditLogs(data.auditLogs || []);
+          if (data.settings) {
+            setAppSettings({ ...DEFAULT_APP_SETTINGS, ...data.settings });
+            localStorage.setItem('appSettings', JSON.stringify({ ...DEFAULT_APP_SETTINGS, ...data.settings }));
+          }
           localStorage.setItem('loans', JSON.stringify(data.loans || []));
           localStorage.setItem('payments', JSON.stringify(data.payments || []));
           localStorage.setItem('members', JSON.stringify(data.members || []));
@@ -537,6 +611,9 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       members,
       contributions,
       auditLogs,
+      appSettings,
+      updateAppSettings,
+      resetAppSettings,
       user,
       storageType,
       setStorageType,

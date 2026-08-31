@@ -13,7 +13,7 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { localLogin, localSignup, login } = useStorage();
+  const { localLogin, localSignup, login, appSettings } = useStorage();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,9 +57,9 @@ export default function Auth() {
           <div className="p-3 bg-primary/10 border border-primary/20 rounded-2xl shadow-[0_0_30px_rgba(var(--primary),0.3)] mb-4">
             <Wallet className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-white neon-text mb-2">DebtFlow</h1>
-          <p className="text-zinc-400 text-center">
-            {isLogin ? 'Sign in to manage your finances' : 'Create an account to get started'}
+          <h1 className="text-3xl font-bold text-white neon-text mb-2">{appSettings.appName}</h1>
+          <p className="text-zinc-400 text-center text-sm">
+            {isLogin ? 'Sign in to manage your finances & loans' : 'Create an account to get started'}
           </p>
         </div>
 

@@ -77,5 +77,12 @@ service cloud.firestore {
       allow update: if isDocOwner() && isCreatingOwnDoc() && uidNotModified();
       allow delete: if isDocOwner();
     }
+
+    match /settings/{settingId} {
+      allow read: if isDocOwner() || (isAuthenticated() && request.auth.uid == settingId);
+      allow create: if isCreatingOwnDoc() || (isAuthenticated() && request.auth.uid == settingId);
+      allow update: if isDocOwner() || (isAuthenticated() && request.auth.uid == settingId);
+      allow delete: if isDocOwner() || (isAuthenticated() && request.auth.uid == settingId);
+    }
   }
 }
