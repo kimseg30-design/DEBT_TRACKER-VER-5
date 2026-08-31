@@ -1,7 +1,26 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Loan, Payment, StorageType, UserProfile, Member, Contribution, AuditLog, BalanceDeclaration } from '../types';
 import { calculateLoanDetails } from './calculations';
-import { auth, db, collection, doc, setDoc, getDocs, query, where, onSnapshot, deleteDoc, updateDoc, signInWithGoogle, logout, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification } from './firebase';
+import { 
+  auth, 
+  db, 
+  collection, 
+  doc, 
+  setDoc, 
+  getDocs, 
+  query, 
+  where, 
+  onSnapshot, 
+  deleteDoc, 
+  updateDoc, 
+  signInWithGoogle, 
+  logout, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendEmailVerification,
+  handleFirestoreError,
+  OperationType
+} from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { toast } from 'sonner';
 
@@ -95,32 +114,34 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const unsubLoans = onSnapshot(loansQuery, (snapshot) => {
         setLoans(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Loan)));
       }, (error) => {
-        console.error("Loans sync error:", error);
-        if (error.code === 'permission-denied') toast.error("Permission denied reading loans. Check Firestore rules.");
+        handleFirestoreError(error, OperationType.LIST, 'loans');
+        if (error.code === 'permission-denied') {
+          toast.error("Permission denied reading loans. Check Firestore rules.");
+        }
       });
       
       const unsubPayments = onSnapshot(paymentsQuery, (snapshot) => {
         setPayments(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Payment)));
       }, (error) => {
-        console.error("Payments sync error:", error);
+        handleFirestoreError(error, OperationType.LIST, 'payments');
       });
       
       const unsubMembers = onSnapshot(membersQuery, (snapshot) => {
         setMembers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Member)));
       }, (error) => {
-        console.error("Members sync error:", error);
+        handleFirestoreError(error, OperationType.LIST, 'members');
       });
       
       const unsubContributions = onSnapshot(contributionsQuery, (snapshot) => {
         setContributions(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Contribution)));
       }, (error) => {
-        console.error("Contributions sync error:", error);
+        handleFirestoreError(error, OperationType.LIST, 'contributions');
       });
       
       const unsubAuditLogs = onSnapshot(auditLogsQuery, (snapshot) => {
         setAuditLogs(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AuditLog)));
       }, (error) => {
-        console.error("Audit logs sync error:", error);
+        handleFirestoreError(error, OperationType.LIST, 'auditLogs');
       });
 
       return () => {
@@ -148,7 +169,11 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setAuditLogs(updated);
       localStorage.setItem('auditLogs', JSON.stringify(updated));
     } else if (user) {
-      await setDoc(doc(db, 'auditLogs', id), { ...newLog, uid: user.uid });
+      try {
+        await setDoc(doc(db, 'auditLogs', id), { ...newLog, uid: user.uid });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `auditLogs/${id}`);
+      }
     }
   };
 
@@ -168,7 +193,13 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setLoans(updated);
       localStorage.setItem('loans', JSON.stringify(updated));
     } else if (user) {
-      await setDoc(doc(db, 'loans', id), { ...newLoan, uid: user.uid });
+      // Optimistic update
+      setLoans(prev => [...prev, newLoan]);
+      try {
+        await setDoc(doc(db, 'loans', id), { ...newLoan, uid: user.uid });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `loans/${id}`);
+      }
     }
     await logAction('ADD_LOAN', `Added loan for ${loanData.borrowerName} (₱${loanData.principal})`);
     return newLoan;
@@ -190,7 +221,12 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setLoans(updated);
       localStorage.setItem('loans', JSON.stringify(updated));
     } else if (user) {
-      await updateDoc(doc(db, 'loans', id), { ...safeLoanData, updatedAt: now });
+      setLoans(prev => prev.map(l => l.id === id ? { ...l, ...loanData, updatedAt: now } : l));
+      try {
+        await updateDoc(doc(db, 'loans', id), { ...safeLoanData, updatedAt: now });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `loans/${id}`);
+      }
     }
     await logAction('UPDATE_LOAN', `Updated loan ID: ${id}`);
   };
@@ -205,10 +241,16 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       localStorage.setItem('loans', JSON.stringify(updatedLoans));
       localStorage.setItem('payments', JSON.stringify(updatedPayments));
     } else if (user) {
-      await deleteDoc(doc(db, 'loans', id));
-      const relatedPayments = payments.filter(p => p.loanId === id);
-      for (const p of relatedPayments) {
-        await deleteDoc(doc(db, 'payments', p.id));
+      setLoans(prev => prev.filter(l => l.id !== id));
+      setPayments(prev => prev.filter(p => p.loanId !== id));
+      try {
+        await deleteDoc(doc(db, 'loans', id));
+        const relatedPayments = payments.filter(p => p.loanId === id);
+        for (const p of relatedPayments) {
+          await deleteDoc(doc(db, 'payments', p.id));
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `loans/${id}`);
       }
     }
     await logAction('DELETE_LOAN', `Deleted loan for ${loan?.borrowerName || id}`);
@@ -275,24 +317,30 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       localStorage.setItem('loans', JSON.stringify(updatedLoans));
       localStorage.setItem('payments', JSON.stringify(updatedPayments));
     } else if (user) {
-      await updateDoc(doc(db, 'loans', loanId), {
-        originalPrincipal: updatedLoan.originalPrincipal,
-        principal: updatedLoan.principal,
-        startDate: updatedLoan.startDate,
-        totalAmount: updatedLoan.totalAmount,
-        totalInterest: updatedLoan.totalInterest,
-        installmentAmount: updatedLoan.installmentAmount,
-        status: updatedLoan.status,
-        isEarlySettlement: false,
-        declarationHistory: updatedLoan.declarationHistory,
-        updatedAt: now,
-      });
-
-      for (const p of currentActivePayments) {
-        await updateDoc(doc(db, 'payments', p.id), {
-          isPreviousCycle: true,
-          declarationId,
+      setLoans(prev => prev.map(l => l.id === loanId ? updatedLoan : l));
+      setPayments(updatedPayments);
+      try {
+        await updateDoc(doc(db, 'loans', loanId), {
+          originalPrincipal: updatedLoan.originalPrincipal,
+          principal: updatedLoan.principal,
+          startDate: updatedLoan.startDate,
+          totalAmount: updatedLoan.totalAmount,
+          totalInterest: updatedLoan.totalInterest,
+          installmentAmount: updatedLoan.installmentAmount,
+          status: updatedLoan.status,
+          isEarlySettlement: false,
+          declarationHistory: updatedLoan.declarationHistory,
+          updatedAt: now,
         });
+
+        for (const p of currentActivePayments) {
+          await updateDoc(doc(db, 'payments', p.id), {
+            isPreviousCycle: true,
+            declarationId,
+          });
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `loans/${loanId}`);
       }
     }
 
@@ -316,7 +364,12 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setPayments(updated);
       localStorage.setItem('payments', JSON.stringify(updated));
     } else if (user) {
-      await setDoc(doc(db, 'payments', id), { ...newPayment, uid: user.uid });
+      setPayments(prev => [...prev, newPayment]);
+      try {
+        await setDoc(doc(db, 'payments', id), { ...newPayment, uid: user.uid });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `payments/${id}`);
+      }
     }
     await logAction('ADD_PAYMENT', `Recorded payment of ₱${paymentData.amount} for loan ID: ${paymentData.loanId}`);
   };
@@ -328,7 +381,12 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setPayments(updated);
       localStorage.setItem('payments', JSON.stringify(updated));
     } else if (user) {
-      await deleteDoc(doc(db, 'payments', id));
+      setPayments(prev => prev.filter(p => p.id !== id));
+      try {
+        await deleteDoc(doc(db, 'payments', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `payments/${id}`);
+      }
     }
     await logAction('DELETE_PAYMENT', `Deleted payment of ₱${payment?.amount || 0} (ID: ${id})`);
   };
@@ -346,7 +404,12 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setMembers(updated);
       localStorage.setItem('members', JSON.stringify(updated));
     } else if (user) {
-      await setDoc(doc(db, 'members', id), { ...newMember, uid: user.uid });
+      setMembers(prev => [...prev, newMember]);
+      try {
+        await setDoc(doc(db, 'members', id), { ...newMember, uid: user.uid });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `members/${id}`);
+      }
     }
     await logAction('ADD_MEMBER', `Added member ${memberData.name}`);
   };
@@ -357,7 +420,12 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setMembers(updated);
       localStorage.setItem('members', JSON.stringify(updated));
     } else if (user) {
-      await updateDoc(doc(db, 'members', id), { ...memberData });
+      setMembers(prev => prev.map(m => m.id === id ? { ...m, ...memberData } : m));
+      try {
+        await updateDoc(doc(db, 'members', id), { ...memberData });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `members/${id}`);
+      }
     }
     await logAction('UPDATE_MEMBER', `Updated member ID: ${id}`);
   };
@@ -369,7 +437,12 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setMembers(updated);
       localStorage.setItem('members', JSON.stringify(updated));
     } else if (user) {
-      await deleteDoc(doc(db, 'members', id));
+      setMembers(prev => prev.filter(m => m.id !== id));
+      try {
+        await deleteDoc(doc(db, 'members', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `members/${id}`);
+      }
     }
     await logAction('DELETE_MEMBER', `Deleted member ${member?.name || id}`);
   };
@@ -387,7 +460,12 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setContributions(updated);
       localStorage.setItem('contributions', JSON.stringify(updated));
     } else if (user) {
-      await setDoc(doc(db, 'contributions', id), { ...newContribution, uid: user.uid });
+      setContributions(prev => [...prev, newContribution]);
+      try {
+        await setDoc(doc(db, 'contributions', id), { ...newContribution, uid: user.uid });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `contributions/${id}`);
+      }
     }
     await logAction('ADD_CONTRIBUTION', `Added contribution of ₱${contributionData.amount} for member ID: ${contributionData.memberId}`);
   };
@@ -398,7 +476,12 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setContributions(updated);
       localStorage.setItem('contributions', JSON.stringify(updated));
     } else if (user) {
-      await updateDoc(doc(db, 'contributions', id), { ...contributionData });
+      setContributions(prev => prev.map(c => c.id === id ? { ...c, ...contributionData } : c));
+      try {
+        await updateDoc(doc(db, 'contributions', id), { ...contributionData });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `contributions/${id}`);
+      }
     }
     await logAction('UPDATE_CONTRIBUTION', `Updated contribution ID: ${id}`);
   };
@@ -410,7 +493,12 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setContributions(updated);
       localStorage.setItem('contributions', JSON.stringify(updated));
     } else if (user) {
-      await deleteDoc(doc(db, 'contributions', id));
+      setContributions(prev => prev.filter(c => c.id !== id));
+      try {
+        await deleteDoc(doc(db, 'contributions', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `contributions/${id}`);
+      }
     }
     await logAction('DELETE_CONTRIBUTION', `Deleted contribution of ₱${contribution?.amount || 0} (ID: ${id})`);
   };

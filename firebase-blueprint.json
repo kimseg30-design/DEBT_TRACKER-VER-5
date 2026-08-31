@@ -8,7 +8,9 @@
         "id": { "type": "string" },
         "borrowerName": { "type": "string" },
         "principal": { "type": "number" },
+        "originalPrincipal": { "type": "number" },
         "interestRate": { "type": "number" },
+        "durationMonths": { "type": "number" },
         "frequency": { "type": "string", "enum": ["Weekly", "Biweekly", "Monthly"] },
         "installments": { "type": "number" },
         "loanType": { "type": "string", "enum": ["New", "Reloan"] },
@@ -23,6 +25,7 @@
         },
         "notes": { "type": "string" },
         "status": { "type": "string", "enum": ["Unpaid", "Partial", "Fully Paid"] },
+        "isEarlySettlement": { "type": "boolean" },
         "totalAmount": { "type": "number" },
         "totalInterest": { "type": "number" },
         "installmentAmount": { "type": "number" },
@@ -44,10 +47,58 @@
         "photoUrl": { "type": "string" },
         "notes": { "type": "string" },
         "isVerified": { "type": "boolean" },
+        "isPreviousCycle": { "type": "boolean" },
+        "declarationId": { "type": "string" },
         "uid": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "loanId", "amount", "date", "uid"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "Represents an organization member",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "joinDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["Active", "Inactive"] },
+        "contact": { "type": "string" },
+        "baseContribution": { "type": "number" },
+        "uid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "joinDate", "status", "uid"]
+    },
+    "Contribution": {
+      "title": "Contribution",
+      "description": "Represents a member contribution record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "memberId": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "uid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "memberId", "amount", "date", "uid"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Represents an audit log entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "user": { "type": "string" },
+        "uid": { "type": "string" }
+      },
+      "required": ["id", "action", "details", "timestamp", "uid"]
     }
   },
   "firestore": {
@@ -58,6 +109,18 @@
     "/payments/{paymentId}": {
       "schema": "Payment",
       "description": "Collection of payments"
+    },
+    "/members/{memberId}": {
+      "schema": "Member",
+      "description": "Collection of members"
+    },
+    "/contributions/{contributionId}": {
+      "schema": "Contribution",
+      "description": "Collection of member contributions"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Collection of audit logs"
     }
   }
 }
