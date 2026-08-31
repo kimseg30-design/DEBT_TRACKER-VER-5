@@ -52,10 +52,10 @@ export default function PaymentBreakdownModal({
   const soa = getLoanStatementOfAccount(loan, payments);
   const formattedRefId = `LN-${(loan.id || '').slice(0, 8).toUpperCase()}`;
 
-  const appName四周 = appSettings?.appName || 'DebtFlow';
+  const appName = appSettings?.appName || 'DebtFlow';
   const businessName = appSettings?.businessName || 'DebtFlow Credit & Financial Services';
   const repName = appSettings?.representativeName || 'Authorized Lending Officer';
-  const contactNumber萃 = appSettings?.contactNumber || '';
+  const contactNumber = appSettings?.contactNumber || '';
 
   // Copy clean breakdown text summary for SMS / Chat / Messenger
   const handleCopySummary = () => {
