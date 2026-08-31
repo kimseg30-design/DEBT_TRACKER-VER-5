@@ -154,15 +154,15 @@ export default function LoanList() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white neon-text">Loans</h2>
-          <p className="text-zinc-300">Manage and track all active and completed loans.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white neon-text">Loans</h2>
+          <p className="text-xs sm:text-sm text-zinc-300">Manage and track all active and completed loans.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" className="bg-background border-primary/20 text-primary hover:bg-primary/10" />}>
-              <Download className="h-4 w-4 mr-2" />
+            <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="bg-background border-primary/20 text-primary hover:bg-primary/10 h-9" />}>
+              <Download className="h-4 w-4 mr-1.5" />
               Export
             </DropdownMenuTrigger>
             <DropdownMenuContent className="bg-card border-primary/10 text-white">
@@ -174,30 +174,31 @@ export default function LoanList() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-[0_0_15px_rgba(var(--primary),0.3)]" onClick={() => navigate('/add-loan')}>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button size="sm" className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-[0_0_15px_rgba(var(--primary),0.3)] h-9" onClick={() => navigate('/add-loan')}>
+            <Plus className="h-4 w-4 mr-1.5" />
             New Loan
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-300" />
           <Input 
             placeholder="Search borrowers..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 bg-card border-primary/10 text-white focus:border-primary/50 transition-all"
+            className="pl-10 bg-card border-primary/10 text-white focus:border-primary/50 transition-all text-sm h-10"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
           <Button 
             variant="outline" 
-            className={cn("bg-card border-primary/10", showFilters ? "text-primary bg-primary/10 border-primary/30" : "text-zinc-300")}
+            size="sm"
+            className={cn("bg-card border-primary/10 shrink-0 h-10", showFilters ? "text-primary bg-primary/10 border-primary/30" : "text-zinc-300")}
             onClick={() => setShowFilters(!showFilters)}
           >
-            <Filter className="h-4 w-4 mr-2" />
+            <Filter className="h-4 w-4 mr-1.5" />
             Filters
           </Button>
           {groupedBorrowers.length > 0 && (
@@ -205,7 +206,7 @@ export default function LoanList() {
               <Button 
                 variant="outline" 
                 size="sm"
-                className="bg-card border-primary/10 text-zinc-300 hover:text-white"
+                className="bg-card border-primary/10 text-zinc-300 hover:text-white shrink-0 h-10 text-xs"
                 onClick={expandAll}
               >
                 Expand All
@@ -213,7 +214,7 @@ export default function LoanList() {
               <Button 
                 variant="outline" 
                 size="sm"
-                className="bg-card border-primary/10 text-zinc-300 hover:text-white"
+                className="bg-card border-primary/10 text-zinc-300 hover:text-white shrink-0 h-10 text-xs"
                 onClick={collapseAll}
               >
                 Collapse All
@@ -332,7 +333,7 @@ export default function LoanList() {
 
                 {/* Dropdown Loans Container */}
                 {isExpanded && (
-                  <div className="pl-4 sm:pl-8 space-y-3 border-l border-primary/15 ml-6 sm:ml-8 py-1 animate-in slide-in-from-top-3 duration-200">
+                  <div className="pl-2.5 sm:pl-6 space-y-3 border-l border-primary/20 ml-2 sm:ml-6 py-1 animate-in slide-in-from-top-3 duration-200">
                     {group.loans.map((loan) => {
                       const progress = getPaymentProgress(loan, payments);
                       const balance = getRemainingBalance(loan, payments);
@@ -342,10 +343,10 @@ export default function LoanList() {
                       return (
                         <Card key={loan.id} className="bg-zinc-950/60 border border-primary/5 hover:border-primary/25 transition-all duration-300 group overflow-hidden">
                           <div className="absolute top-0 left-0 w-1 h-full bg-primary/40 group-hover:bg-primary transition-colors"></div>
-                          <CardContent className="p-5">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                              <div className="flex-1 space-y-1">
-                                <div className="flex items-center gap-3">
+                          <CardContent className="p-3.5 sm:p-5">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
+                              <div className="flex-1 space-y-1.5">
+                                <div className="flex flex-wrap items-center gap-2">
                                   <span className="font-bold text-white/90 text-sm md:text-base">{loan.loanType}</span>
                                   <Badge variant="outline" className={cn(
                                     "text-[9px] uppercase tracking-wider py-0.5",
@@ -366,7 +367,7 @@ export default function LoanList() {
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-300">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-300">
                                   <span>Principal: <span className="text-white font-medium">₱{loan.principal.toLocaleString()}</span></span>
                                   {loan.originalPrincipal && loan.originalPrincipal !== loan.principal && (
                                     <>
@@ -375,7 +376,7 @@ export default function LoanList() {
                                     </>
                                   )}
                                   <span className="text-zinc-700">•</span>
-                                  <span>Accrued Interest: <span className="text-amber-400 font-bold">₱{declaredInterest.toLocaleString()}</span> ({elapsedMonths} {elapsedMonths === 1 ? 'Month' : 'Months'})</span>
+                                  <span>Accrued Int: <span className="text-amber-400 font-bold">₱{declaredInterest.toLocaleString()}</span> ({elapsedMonths} {elapsedMonths === 1 ? 'mo' : 'mos'})</span>
                                   <span className="text-zinc-700">•</span>
                                   <span>{loan.frequency}</span>
                                   <span className="text-zinc-700">•</span>
@@ -383,18 +384,18 @@ export default function LoanList() {
                                 </div>
                               </div>
 
-                              <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-4 border-t md:border-t-0 border-zinc-900 pt-3 md:pt-0">
+                              <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 sm:gap-4 border-t md:border-t-0 border-zinc-900/80 pt-3 md:pt-0">
                                 <div className="text-left md:text-right">
                                   <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">Remaining</p>
-                                  <p className="text-base font-bold text-primary">₱{balance.toLocaleString()}</p>
+                                  <p className="text-sm sm:text-base font-bold text-primary">₱{balance.toLocaleString()}</p>
                                 </div>
                                 
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 sm:gap-2">
                                   {balance > 0 && loan.status !== 'Fully Paid' && (
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="h-8 border-emerald-500/30 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-500/20 text-xs hidden sm:flex items-center"
+                                      className="h-8 px-2.5 border-emerald-500/30 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-500/20 text-xs hidden sm:flex items-center"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setDeclaringLoanId(loan.id);
@@ -408,7 +409,7 @@ export default function LoanList() {
                                   <Button 
                                     variant="secondary" 
                                     size="sm" 
-                                    className="h-8 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground text-xs shadow-sm transition-all"
+                                    className="h-8 px-3 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground text-xs shadow-sm transition-all"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedLoanId(loan.id);

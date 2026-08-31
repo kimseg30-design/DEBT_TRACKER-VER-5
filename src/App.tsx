@@ -147,6 +147,7 @@ function Sidebar({ isOpen, setIsOpen, onOpenInstall }: SidebarProps) {
 
 function AppContent() {
   const { user, appSettings } = useStorage();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
@@ -204,7 +205,7 @@ function AppContent() {
 
       <Sidebar isOpen={isOpen} setIsOpen={setIsOpen} onOpenInstall={() => setIsInstallModalOpen(true)} />
       
-      <main className="flex-1 lg:ml-64 p-4 lg:p-8 overflow-auto">
+      <main className="flex-1 lg:ml-64 p-3.5 sm:p-6 lg:p-8 overflow-x-hidden overflow-y-auto pb-28 lg:pb-8">
         <div className="max-w-7xl mx-auto">
           <Routes>
             <Route path="/" element={<Dashboard />} />
@@ -218,6 +219,70 @@ function AppContent() {
           </Routes>
         </div>
       </main>
+
+      {/* Mobile & Tablet Fixed Bottom Navigation Bar */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-xl border-t border-primary/20 pb-safe px-2 py-1.5 shadow-[0_-5px_25px_rgba(0,0,0,0.7)]">
+        <div className="flex items-center justify-around max-w-lg mx-auto">
+          <Link
+            to="/"
+            className={cn(
+              "flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px]",
+              location.pathname === '/'
+                ? "text-primary font-bold"
+                : "text-zinc-400 hover:text-zinc-200"
+            )}
+          >
+            <LayoutDashboard className={cn("h-5 w-5", location.pathname === '/' ? "stroke-[2.5]" : "stroke-2")} />
+            <span className="text-[10px] mt-0.5 tracking-tight">Home</span>
+          </Link>
+
+          <Link
+            to="/loans"
+            className={cn(
+              "flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px]",
+              location.pathname.startsWith('/loans')
+                ? "text-primary font-bold"
+                : "text-zinc-400 hover:text-zinc-200"
+            )}
+          >
+            <Wallet className={cn("h-5 w-5", location.pathname.startsWith('/loans') ? "stroke-[2.5]" : "stroke-2")} />
+            <span className="text-[10px] mt-0.5 tracking-tight">Loans</span>
+          </Link>
+
+          {/* Central Action Button for Fast Loan Creation on Mobile */}
+          <Link
+            to="/add-loan"
+            className="flex flex-col items-center justify-center -mt-5"
+          >
+            <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-[0_0_20px_rgba(var(--primary),0.6)] border-2 border-background active:scale-95 transition-transform">
+              <PlusCircle className="h-6 w-6 stroke-[2.5]" />
+            </div>
+            <span className="text-[10px] mt-0.5 font-bold text-primary">New Loan</span>
+          </Link>
+
+          <Link
+            to="/members"
+            className={cn(
+              "flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px]",
+              location.pathname === '/members'
+                ? "text-primary font-bold"
+                : "text-zinc-400 hover:text-zinc-200"
+            )}
+          >
+            <Users className={cn("h-5 w-5", location.pathname === '/members' ? "stroke-[2.5]" : "stroke-2")} />
+            <span className="text-[10px] mt-0.5 tracking-tight">Members</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setIsOpen(true)}
+            className="flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 min-w-[56px] text-zinc-400 hover:text-zinc-200 active:scale-95"
+          >
+            <Menu className="h-5 w-5 stroke-2" />
+            <span className="text-[10px] mt-0.5 tracking-tight">Menu</span>
+          </button>
+        </div>
+      </nav>
 
       <InstallAppModal 
         isOpen={isInstallModalOpen} 

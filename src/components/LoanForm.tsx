@@ -409,21 +409,6 @@ export default function LoanForm() {
                 </div>
               </div>
 
-              <div className="pt-2 pb-2 border-t border-zinc-800 space-y-2.5 text-xs">
-                <div className="flex justify-between items-center text-zinc-300">
-                  <span>Date Granted:</span>
-                  <span className="font-semibold text-white">{formatPHTDate(startDate || getPhilippineYMD())}</span>
-                </div>
-                <div className="flex justify-between items-center bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg">
-                  <span className="font-bold text-amber-300">1st Payment Due:</span>
-                  <span className="font-bold text-amber-200 font-mono">{formatPHTDate(previewFirstPaymentDate)}</span>
-                </div>
-                <div className="flex justify-between items-center text-zinc-300">
-                  <span>Maturity Date:</span>
-                  <span className="font-semibold text-white">{formatPHTDate(previewMaturityDate)}</span>
-                </div>
-              </div>
-
               <div className="pt-6 border-t border-primary/10 space-y-3">
                 <Button type="submit" className="w-full bg-primary hover:bg-primary/80 text-primary-foreground h-12 shadow-[0_0_15px_rgba(var(--primary),0.3)] font-semibold">
                   <Save className="h-5 w-5 mr-2" />

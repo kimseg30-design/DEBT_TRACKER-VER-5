@@ -397,11 +397,11 @@ export default function Contributions() {
                               return (
                                 <div 
                                   key={contribution.id} 
-                                  className={`flex items-center justify-between p-3.5 bg-background/50 border rounded-xl hover:border-primary/20 transition-all duration-300 ${contribution.isVerified ? 'border-accent/15 hover:border-accent/30 bg-accent/[0.01]' : 'border-primary/5'}`}
+                                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3.5 bg-background/50 border rounded-xl hover:border-primary/20 transition-all duration-300 ${contribution.isVerified ? 'border-accent/15 hover:border-accent/30 bg-accent/[0.01]' : 'border-primary/5'}`}
                                 >
-                                  <div className="flex items-center gap-4">
+                                  <div className="flex items-center gap-3 sm:gap-4">
                                     {/* Checklist Checkbox toggle */}
-                                    <div className="flex items-center">
+                                    <div className="flex items-center shrink-0">
                                       <Checkbox 
                                         id={`verify-contrib-${contribution.id}`} 
                                         checked={contribution.isVerified || false}
@@ -410,11 +410,11 @@ export default function Contributions() {
                                       />
                                     </div>
 
-                                    <div>
-                                      <div className="flex flex-wrap items-center gap-2">
+                                    <div className="min-w-0">
+                                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                                         <label 
                                           htmlFor={`verify-contrib-${contribution.id}`}
-                                          className={`font-bold text-sm cursor-pointer transition-colors ${contribution.isVerified ? 'text-zinc-400 line-through decoration-zinc-500/40' : 'text-white'}`}
+                                          className={`font-bold text-sm cursor-pointer transition-colors truncate ${contribution.isVerified ? 'text-zinc-400 line-through decoration-zinc-500/40' : 'text-white'}`}
                                         >
                                           {member?.name || 'Unknown Member'}
                                         </label>
@@ -434,7 +434,7 @@ export default function Contributions() {
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center justify-between sm:justify-end gap-3 pl-8 sm:pl-0 border-t sm:border-t-0 border-zinc-800/40 pt-2 sm:pt-0">
                                     <p className={`text-base font-bold transition-colors ${contribution.isVerified ? 'text-accent' : 'text-primary'}`}>
                                       ₱{contribution.amount.toLocaleString()}
                                     </p>

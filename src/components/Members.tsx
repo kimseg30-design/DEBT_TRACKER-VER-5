@@ -98,23 +98,23 @@ export default function Members() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white neon-text">Members</h2>
-          <p className="text-zinc-300">Manage your members and their profiles.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white neon-text">Members</h2>
+          <p className="text-xs sm:text-sm text-zinc-300">Manage your members and their profiles.</p>
         </div>
         
         <Dialog open={isAddModalOpen} onOpenChange={(open) => {
           setIsAddModalOpen(open);
           if (!open) resetForm();
         }}>
-          <DialogTrigger render={<Button className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-[0_0_15px_rgba(var(--primary),0.3)]" />}>
-            <Plus className="h-4 w-4 mr-2" />
+          <DialogTrigger render={<Button size="sm" className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-[0_0_15px_rgba(var(--primary),0.3)] h-9 self-start sm:self-auto" />}>
+            <Plus className="h-4 w-4 mr-1.5" />
             Add Member
           </DialogTrigger>
-          <DialogContent className="bg-card border-primary/10 text-white">
+          <DialogContent className="max-w-md w-[92vw] sm:w-full bg-card border-primary/10 text-white p-4 sm:p-6 rounded-2xl">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-bold neon-text">
+              <DialogTitle className="text-xl sm:text-2xl font-bold neon-text">
                 {editingId ? 'Edit Member' : 'Add New Member'}
               </DialogTitle>
             </DialogHeader>

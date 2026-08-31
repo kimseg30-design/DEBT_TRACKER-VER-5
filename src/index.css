@@ -106,6 +106,34 @@
       radial-gradient(circle at 50% -20%, oklch(0.75 0.35 190 / 0.15), transparent 50%),
       radial-gradient(circle at 0% 100%, oklch(0.75 0.35 330 / 0.1), transparent 40%);
     background-attachment: fixed;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* Custom Safe Area Insets for Modern Mobile & Foldables */
+.pb-safe {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+.bottom-safe {
+  bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Smooth Horizontal Scrollbar hide utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Touch-optimized active states */
+@media (hover: none) and (pointer: coarse) {
+  button, a {
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
