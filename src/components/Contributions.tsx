@@ -6,7 +6,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
-import { Wallet, Plus, Trash2, CheckCircle2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { Wallet, Plus, Trash2, CheckCircle2, Clock, ChevronDown, ChevronUp, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPhilippineYMD, getPhilippineDateParts, formatPHTDate } from '../lib/phtDate';
 
@@ -93,6 +93,30 @@ export default function Contributions() {
     setMemberAmounts(prev => ({ ...prev, [id]: value }));
   };
 
+  // Count how many distinct weeks each member has contributed to
+  const memberWeekCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    const memberWeeksSet: Record<string, Set<string>> = {};
+    
+    contributions.forEach(c => {
+      if (!memberWeeksSet[c.memberId]) {
+        memberWeeksSet[c.memberId] = new Set();
+      }
+      const { year, month, day } = getPhilippineDateParts(c.date);
+      const pstMidnight = new Date(Date.UTC(year, month - 1, day));
+      const dayOfWeek = pstMidnight.getUTCDay();
+      const sunday = new Date(pstMidnight.getTime() - dayOfWeek * 86400000);
+      const weekKey = sunday.toISOString().split('T')[0];
+      memberWeeksSet[c.memberId].add(weekKey);
+    });
+
+    Object.keys(memberWeeksSet).forEach(memberId => {
+      map[memberId] = memberWeeksSet[memberId].size;
+    });
+
+    return map;
+  }, [contributions]);
+
   // Group contributions by calendar week
   const groupedWeeks = useMemo(() => {
     const groups: Record<string, typeof contributions> = {};
@@ -111,32 +135,36 @@ export default function Contributions() {
       groups[weekKey].push(c);
     });
 
-    return Object.keys(groups)
-      .sort((a, b) => b.localeCompare(a)) // sort weeks descending
-      .map(weekKey => {
-        const list = groups[weekKey];
-        const label = `Week of ${formatPHTDate(weekKey)}`;
-        
-        // Calculate validations & metrics
-        const totalExpected = list.reduce((sum, c) => sum + c.amount, 0);
-        const totalVerified = list.filter(c => c.isVerified).reduce((sum, c) => sum + c.amount, 0);
-        const verifiedCount = list.filter(c => c.isVerified).length;
-        const totalCount = list.length;
-        const isFullyVerified = verifiedCount === totalCount;
-        const percentVerified = totalCount > 0 ? (verifiedCount / totalCount) * 100 : 0;
+    const sortedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+    const totalWeeks = sortedKeys.length;
 
-        return {
-          weekKey,
-          label,
-          contributions: list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-          totalExpected,
-          totalVerified,
-          verifiedCount,
-          totalCount,
-          isFullyVerified,
-          percentVerified
-        };
-      });
+    return sortedKeys.map((weekKey, index) => {
+      const list = groups[weekKey];
+      const label = `Week of ${formatPHTDate(weekKey)}`;
+      const weekNumber = totalWeeks - index; // Chronological week number
+      
+      // Calculate validations & metrics
+      const totalExpected = list.reduce((sum, c) => sum + c.amount, 0);
+      const totalVerified = list.filter(c => c.isVerified).reduce((sum, c) => sum + c.amount, 0);
+      const verifiedCount = list.filter(c => c.isVerified).length;
+      const totalCount = list.length;
+      const isFullyVerified = verifiedCount === totalCount;
+      const percentVerified = totalCount > 0 ? (verifiedCount / totalCount) * 100 : 0;
+
+      return {
+        weekKey,
+        label,
+        weekNumber,
+        totalWeeks,
+        contributions: list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        totalExpected,
+        totalVerified,
+        verifiedCount,
+        totalCount,
+        isFullyVerified,
+        percentVerified
+      };
+    });
   }, [contributions]);
 
   // Expand the first week by default when loaded
@@ -158,11 +186,35 @@ export default function Contributions() {
     }));
   };
 
+  const totalContributionsAmount = useMemo(() => {
+    return contributions.reduce((sum, c) => sum + c.amount, 0);
+  }, [contributions]);
+
+  const totalVerifiedAmount = useMemo(() => {
+    return contributions.filter(c => c.isVerified).reduce((sum, c) => sum + c.amount, 0);
+  }, [contributions]);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-white neon-text">Contributions</h2>
-        <p className="text-zinc-300">Manage weekly contributions for all members.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-white neon-text">Contributions</h2>
+          <p className="text-zinc-300">Manage weekly contributions and verify checklists for all members.</p>
+        </div>
+        
+        {/* Quick Stats Header Summary */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="px-3 py-1.5 bg-card/80 border border-primary/20 rounded-xl flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-primary" />
+            <span className="text-xs text-zinc-400">Total Weeks:</span>
+            <span className="text-xs font-bold text-white font-mono">{groupedWeeks.length} {groupedWeeks.length === 1 ? 'Week' : 'Weeks'}</span>
+          </div>
+          <div className="px-3 py-1.5 bg-card/80 border border-emerald-500/20 rounded-xl flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <span className="text-xs text-zinc-400">Total Capital:</span>
+            <span className="text-xs font-bold text-emerald-400 font-mono">₱{totalContributionsAmount.toLocaleString()}</span>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -201,9 +253,11 @@ export default function Contributions() {
                           <Label htmlFor={`member-${member.id}`} className="text-sm cursor-pointer text-white">
                             {member.name}
                           </Label>
-                          <span className="text-[10px] text-zinc-400">
-                            Base: ₱{member.baseContribution !== undefined ? member.baseContribution.toLocaleString() : '50'}
-                          </span>
+                          <div className="flex items-center gap-1.5 text-[10px] text-zinc-400">
+                            <span>Base: ₱{member.baseContribution !== undefined ? member.baseContribution.toLocaleString() : '50'}</span>
+                            <span>•</span>
+                            <span className="text-primary font-medium">{memberWeekCounts[member.id] || 0} {(memberWeekCounts[member.id] || 0) === 1 ? 'week' : 'weeks'}</span>
+                          </div>
                         </div>
                       </div>
                       <div className="w-20">
@@ -239,7 +293,12 @@ export default function Contributions() {
 
         <Card className="bg-card border-primary/10 shadow-[0_0_20px_rgba(var(--primary),0.05)] lg:col-span-2">
           <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2">
-            <CardTitle className="text-white">Weekly Contribution Checklists</CardTitle>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <CardTitle className="text-white">Weekly Contribution Checklists</CardTitle>
+              <Badge variant="outline" className="bg-primary/10 border-primary/30 text-primary font-bold text-xs py-0.5 px-2.5">
+                {groupedWeeks.length} {groupedWeeks.length === 1 ? 'Week' : 'Weeks'}
+              </Badge>
+            </div>
             {groupedWeeks.length > 0 && (
               <div className="flex gap-2">
                 <Button 
@@ -278,7 +337,10 @@ export default function Contributions() {
                         className={`p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer rounded-lg hover:bg-primary/5 transition-all duration-300 select-none ${isExpanded ? 'bg-primary/5 border border-primary/15' : ''}`}
                       >
                         <div className="flex-1 space-y-2">
-                          <div className="flex flex-wrap items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <Badge variant="secondary" className="bg-zinc-800 text-zinc-200 border border-zinc-700 text-xs font-semibold px-2 py-0.5">
+                              Week {week.weekNumber} of {groupedWeeks.length}
+                            </Badge>
                             <h4 className="font-bold text-white tracking-tight">{week.label}</h4>
                             <Badge variant="outline" className={`text-[10px] font-bold ${week.isFullyVerified ? 'bg-accent/10 text-accent border-accent/30' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30'}`}>
                               {week.isFullyVerified ? '✓ Fully Verified' : '⚠️ Pending Verification'}
@@ -318,8 +380,8 @@ export default function Contributions() {
                               <CheckCircle2 className="h-4 w-4 shrink-0" />
                               <span>
                                 {week.isFullyVerified 
-                                  ? "Validation Checklist Complete: All weekly contributions have been audited and verified successfully." 
-                                  : `Validation Checklist Pending: ${week.totalCount - week.verifiedCount} contribution(s) require verification.`}
+                                  ? `Week ${week.weekNumber} Checklist Complete: All weekly contributions have been audited and verified successfully.` 
+                                  : `Week ${week.weekNumber} Checklist Pending: ${week.totalCount - week.verifiedCount} contribution(s) require verification.`}
                               </span>
                             </div>
                             <span className="font-mono text-[11px] bg-background/50 px-2.5 py-0.5 rounded border border-current/25">
@@ -331,6 +393,7 @@ export default function Contributions() {
                           <div className="space-y-2">
                             {week.contributions.map((contribution) => {
                               const member = members.find(m => m.id === contribution.memberId);
+                              const memberWeeks = memberWeekCounts[contribution.memberId] || 1;
                               return (
                                 <div 
                                   key={contribution.id} 
@@ -348,18 +411,24 @@ export default function Contributions() {
                                     </div>
 
                                     <div>
-                                      <div className="flex items-center gap-2">
+                                      <div className="flex flex-wrap items-center gap-2">
                                         <label 
                                           htmlFor={`verify-contrib-${contribution.id}`}
                                           className={`font-bold text-sm cursor-pointer transition-colors ${contribution.isVerified ? 'text-zinc-400 line-through decoration-zinc-500/40' : 'text-white'}`}
                                         >
                                           {member?.name || 'Unknown Member'}
                                         </label>
+                                        
+                                        {/* Number of weeks contributed badge */}
+                                        <Badge variant="outline" className="text-[10px] px-2 py-0 bg-zinc-800/90 text-zinc-300 border-zinc-700 font-mono">
+                                          {memberWeeks} {memberWeeks === 1 ? 'week' : 'weeks'}
+                                        </Badge>
+
                                         <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold border transition-colors ${contribution.isVerified ? 'bg-accent/10 text-accent border-accent/20' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}`}>
                                           {contribution.isVerified ? 'Verified' : 'Pending'}
                                         </span>
                                       </div>
-                                      <p className="text-[11px] text-zinc-400">
+                                      <p className="text-[11px] text-zinc-400 mt-0.5">
                                         {formatPHTDate(contribution.date)} • {contribution.notes}
                                       </p>
                                     </div>

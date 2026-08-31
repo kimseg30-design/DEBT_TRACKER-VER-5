@@ -19,12 +19,25 @@ export default function Members() {
   const [baseContribution, setBaseContribution] = useState('50');
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const memberTotalContributions = useMemo(() => {
-    const map: Record<string, number> = {};
+  const { memberTotalContributions, memberWeeksCount } = useMemo(() => {
+    const totalMap: Record<string, number> = {};
+    const weeksMap: Record<string, Set<string>> = {};
+    
     contributions.forEach(c => {
-      map[c.memberId] = (map[c.memberId] || 0) + (c.amount || 0);
+      totalMap[c.memberId] = (totalMap[c.memberId] || 0) + (c.amount || 0);
+      if (!weeksMap[c.memberId]) {
+        weeksMap[c.memberId] = new Set();
+      }
+      const weekKey = c.date.split('T')[0];
+      weeksMap[c.memberId].add(weekKey);
     });
-    return map;
+
+    const weeksCountMap: Record<string, number> = {};
+    Object.keys(weeksMap).forEach(mId => {
+      weeksCountMap[mId] = weeksMap[mId].size;
+    });
+
+    return { memberTotalContributions: totalMap, memberWeeksCount: weeksCountMap };
   }, [contributions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -181,8 +194,8 @@ export default function Members() {
                     </p>
                     <p className="text-sm text-emerald-400 font-bold mt-1 flex items-center gap-1.5">
                       <Wallet className="h-3.5 w-3.5 text-emerald-400" />
-                      <span>Total Contributions:</span>
-                      <span>₱{(memberTotalContributions[member.id] || 0).toLocaleString()}</span>
+                      <span>Total: ₱{(memberTotalContributions[member.id] || 0).toLocaleString()}</span>
+                      <span className="text-xs font-normal text-zinc-400 font-mono">({memberWeeksCount[member.id] || 0} {(memberWeeksCount[member.id] || 0) === 1 ? 'week' : 'weeks'})</span>
                     </p>
                     <p className="text-xs text-zinc-500 mt-2">Joined: {formatPHTDate(member.joinDate)}</p>
                   </div>
