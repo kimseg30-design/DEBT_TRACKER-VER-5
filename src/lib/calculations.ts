@@ -324,3 +324,155 @@ export function calculateLatePenalty(loan: Loan, payments: Payment[], currentDat
   const details = getLoanOverdueDetails(loan, payments, currentDate);
   return details.pendingPenaltyAmount;
 }
+
+export interface PaymentBreakdownItem {
+  id: string;
+  date: string;
+  amount: number;
+  principalPortion: number;
+  interestPortion: number;
+  penaltyPortion: number;
+  runningPrincipalBalance: number;
+  runningTotalPaid: number;
+  notes?: string;
+  isPreviousCycle?: boolean;
+  type: 'Interest Payment' | 'Principal Repayment' | 'Combined Installment' | 'Balance Declaration';
+}
+
+export interface LoanStatementOfAccount {
+  loanId: string;
+  borrowerName: string;
+  originalPrincipal: number;
+  currentPrincipal: number;
+  interestRate: number;
+  frequency: PaymentFrequency;
+  startDate: string;
+  elapsedMonths: number;
+  totalInterestAccrued: number;
+  totalInterestPaid: number;
+  totalPrincipalPaid: number;
+  totalPenaltiesPaid: number;
+  totalCashCollected: number;
+  currentRemainingBalance: number;
+  currentStatus: 'Unpaid' | 'Partial' | 'Fully Paid';
+  isOverdue: boolean;
+  daysOverdue: number;
+  pendingPenaltyAmount: number;
+  items: PaymentBreakdownItem[];
+}
+
+export function getLoanStatementOfAccount(
+  loan: Loan, 
+  allPayments: Payment[], 
+  currentDate: Date = getPhilippineNow()
+): LoanStatementOfAccount {
+  const origPrincipal = loan.originalPrincipal || loan.principal;
+  const loanPayments = allPayments
+    .filter(p => p.loanId === loan.id)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const { elapsedMonths, declaredInterest } = calculateCurrentDeclaredDetails(loan, allPayments, currentDate);
+  const overdue = getLoanOverdueDetails(loan, allPayments, currentDate);
+
+  let runningPrincipal = origPrincipal;
+  let runningTotalPaid = 0;
+  let totalInterestPaid = 0;
+  let totalPrincipalPaid = 0;
+  let totalPenaltiesPaid = 0;
+
+  const items: PaymentBreakdownItem[] = [];
+
+  // Monthly interest baseline (e.g. 5% of ₱20,000 = ₱1,000)
+  const monthlyInterestRate = loan.interestRate / 100;
+
+  loanPayments.forEach((p) => {
+    const penaltyPaid = p.penaltyPaid || 0;
+    const netAmount = p.amount; // Base payment amount
+    runningTotalPaid += netAmount + penaltyPaid;
+    totalPenaltiesPaid += penaltyPaid;
+
+    const baseMonthlyInterest = Math.round(runningPrincipal * monthlyInterestRate);
+
+    let interestPortion = 0;
+    let principalPortion = 0;
+    let type: PaymentBreakdownItem['type'] = 'Combined Installment';
+
+    // Heuristic & exact allocation:
+    // If payment exactly matches the monthly interest (e.g. ₱1,000)
+    if (Math.abs(netAmount - baseMonthlyInterest) < 10) {
+      interestPortion = netAmount;
+      principalPortion = 0;
+      type = 'Interest Payment';
+      totalInterestPaid += interestPortion;
+    } else if (netAmount < baseMonthlyInterest) {
+      // Partial interest payment
+      interestPortion = netAmount;
+      principalPortion = 0;
+      type = 'Interest Payment';
+      totalInterestPaid += interestPortion;
+    } else {
+      // If it has notes mentioning interest or principal, or large payment
+      if (p.notes?.toLowerCase().includes('interest only') || p.notes?.toLowerCase().includes('interes')) {
+        interestPortion = netAmount;
+        principalPortion = 0;
+        type = 'Interest Payment';
+        totalInterestPaid += interestPortion;
+      } else if (p.notes?.toLowerCase().includes('principal') || p.notes?.toLowerCase().includes('punong')) {
+        principalPortion = netAmount;
+        interestPortion = 0;
+        type = 'Principal Repayment';
+        totalPrincipalPaid += principalPortion;
+        runningPrincipal = Math.max(0, runningPrincipal - principalPortion);
+      } else {
+        // Combined installment or lump-sum payment
+        // Split proportionally: standard monthly interest covered first, remainder to principal
+        interestPortion = Math.min(baseMonthlyInterest, netAmount);
+        principalPortion = Math.max(0, netAmount - interestPortion);
+        type = principalPortion > 0 && interestPortion > 0 ? 'Combined Installment' : principalPortion > 0 ? 'Principal Repayment' : 'Interest Payment';
+        totalInterestPaid += interestPortion;
+        totalPrincipalPaid += principalPortion;
+        runningPrincipal = Math.max(0, runningPrincipal - principalPortion);
+      }
+    }
+
+    items.push({
+      id: p.id,
+      date: p.date,
+      amount: netAmount,
+      principalPortion,
+      interestPortion,
+      penaltyPortion: penaltyPaid,
+      runningPrincipalBalance: runningPrincipal,
+      runningTotalPaid,
+      notes: p.notes,
+      isPreviousCycle: p.isPreviousCycle,
+      type,
+    });
+  });
+
+  // If there were balance declarations, align running balance with current principal
+  const currentRemainingBalance = getRemainingBalance(loan, allPayments, currentDate);
+  const status = getLoanStatus(loan, allPayments, currentDate);
+
+  return {
+    loanId: loan.id,
+    borrowerName: loan.borrowerName,
+    originalPrincipal: origPrincipal,
+    currentPrincipal: loan.principal,
+    interestRate: loan.interestRate,
+    frequency: loan.frequency,
+    startDate: loan.startDate,
+    elapsedMonths,
+    totalInterestAccrued: declaredInterest,
+    totalInterestPaid,
+    totalPrincipalPaid,
+    totalPenaltiesPaid,
+    totalCashCollected: runningTotalPaid,
+    currentRemainingBalance,
+    currentStatus: status,
+    isOverdue: overdue.isOverdue,
+    daysOverdue: overdue.daysOverdue,
+    pendingPenaltyAmount: overdue.pendingPenaltyAmount,
+    items,
+  };
+}

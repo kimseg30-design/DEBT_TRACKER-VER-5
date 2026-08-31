@@ -28,11 +28,13 @@ import {
   AlertCircle,
   AlertTriangle,
   Receipt,
-  CheckCircle
+  CheckCircle,
+  FileText
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import PaymentModal from './PaymentModal';
+import PaymentBreakdownModal from './PaymentBreakdownModal';
 import { 
   BarChart, 
   Bar, 
@@ -47,6 +49,7 @@ import {
 export default function Dashboard() {
   const { loans, payments, members, contributions } = useStorage();
   const [selectedLoanForPayment, setSelectedLoanForPayment] = useState<{ id: string; applyPenalty?: boolean } | null>(null);
+  const [viewingBreakdownLoanId, setViewingBreakdownLoanId] = useState<string | null>(null);
 
   // 1. Total Disbursed (Principal disbursed across all loans)
   const totalDisbursed = loans.reduce((sum, l) => sum + (l.originalPrincipal || l.principal), 0);
@@ -556,10 +559,15 @@ export default function Dashboard() {
                   {fullyPaidBorrowersList.map((item) => (
                     <tr 
                       key={item.id}
-                      className="hover:bg-emerald-500/5 transition-colors text-zinc-300"
+                      onClick={() => setViewingBreakdownLoanId(item.id)}
+                      className="hover:bg-emerald-500/10 transition-colors text-zinc-300 cursor-pointer"
+                      title="Click to view Statement of Account and Interest Breakdown"
                     >
                       <td className="py-3 px-4">
-                        <div className="font-bold text-white text-sm">{item.borrowerName}</div>
+                        <div className="font-bold text-white text-sm flex items-center gap-1.5">
+                          <span>{item.borrowerName}</span>
+                          <FileText className="h-3 w-3 text-primary/70" />
+                        </div>
                         <span className="text-[10px] font-mono text-zinc-500">ID: {item.id.slice(0, 8)}</span>
                       </td>
                       <td className="py-3 px-4 font-medium text-white">
@@ -642,13 +650,19 @@ export default function Dashboard() {
                 recentPayments.map((payment) => {
                   const loan = loans.find(l => l.id === payment.loanId);
                   return (
-                    <div key={payment.id} className="flex items-center gap-4 p-2 rounded-lg hover:bg-primary/5 transition-colors">
+                    <div 
+                      key={payment.id} 
+                      onClick={() => loan && setViewingBreakdownLoanId(loan.id)}
+                      className="flex items-center gap-4 p-2 rounded-lg hover:bg-primary/10 transition-colors cursor-pointer"
+                      title="Click to view Statement of Account and Breakdown"
+                    >
                       <div className="p-2 bg-accent/10 rounded-full">
                         <ArrowDownRight className="h-4 w-4 text-accent" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">
-                          {loan?.borrowerName || 'Unknown Borrower'}
+                        <p className="text-sm font-medium text-white truncate flex items-center gap-1.5">
+                          <span>{loan?.borrowerName || 'Unknown Borrower'}</span>
+                          <FileText className="h-3 w-3 text-primary/70" />
                         </p>
                         <p className="text-xs text-zinc-300">
                           {formatPHTDate(payment.date)}
@@ -684,6 +698,16 @@ export default function Dashboard() {
           loanId={selectedLoanForPayment.id}
           initialApplyPenalty={selectedLoanForPayment.applyPenalty}
           onClose={() => setSelectedLoanForPayment(null)}
+        />
+      )}
+
+      {/* Breakdown / Statement of Account Modal */}
+      {viewingBreakdownLoanId && (
+        <PaymentBreakdownModal
+          loan={loans.find(l => l.id === viewingBreakdownLoanId) || null}
+          isOpen={!!viewingBreakdownLoanId}
+          onClose={() => setViewingBreakdownLoanId(null)}
+          onRecordPayment={(loanId) => setSelectedLoanForPayment({ id: loanId })}
         />
       )}
     </div>

@@ -35,6 +35,7 @@ import { formatPHTDate } from '../lib/phtDate';
 import PaymentModal from './PaymentModal';
 import DeclareBalanceModal from './DeclareBalanceModal';
 import LoanDocumentsModal from './LoanDocumentsModal';
+import PaymentBreakdownModal from './PaymentBreakdownModal';
 import { ConfirmDialog } from './ConfirmDialog';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
@@ -50,6 +51,7 @@ export default function LoanList() {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
   const [declaringLoanId, setDeclaringLoanId] = useState<string | null>(null);
   const [viewingDocLoanId, setViewingDocLoanId] = useState<string | null>(null);
+  const [viewingBreakdownLoanId, setViewingBreakdownLoanId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [loanToDelete, setLoanToDelete] = useState<string | null>(null);
   const [expandedBorrowers, setExpandedBorrowers] = useState<Record<string, boolean>>({});
@@ -391,6 +393,19 @@ export default function LoanList() {
                                 </div>
                                 
                                 <div className="flex items-center gap-1.5 sm:gap-2">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-8 px-2.5 bg-primary/5 border-primary/20 text-primary hover:bg-primary/20 text-xs flex items-center"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setViewingBreakdownLoanId(loan.id);
+                                    }}
+                                    title="View Statement of Account and Interest vs Principal Breakdown"
+                                  >
+                                    <FileText className="h-3.5 w-3.5 mr-1" />
+                                    Breakdown
+                                  </Button>
                                   {balance > 0 && loan.status !== 'Fully Paid' && (
                                     <Button
                                       variant="outline"
@@ -425,9 +440,15 @@ export default function LoanList() {
                                     <DropdownMenuContent align="end" className="bg-card border-primary/10 text-white">
                                       <DropdownMenuItem onClick={(e) => {
                                         e.stopPropagation();
+                                        setViewingBreakdownLoanId(loan.id);
+                                      }}>
+                                        <FileText className="h-4 w-4 mr-2 text-primary" /> Statement & Interest Breakdown (SOA)
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
                                         setViewingDocLoanId(loan.id);
                                       }}>
-                                        <FileText className="h-4 w-4 mr-2 text-primary" /> Loan Documents (Paper, PN, DS)
+                                        <FileText className="h-4 w-4 mr-2 text-zinc-300" /> Loan Documents (Paper, PN, DS)
                                       </DropdownMenuItem>
                                       <DropdownMenuItem onClick={(e) => {
                                         e.stopPropagation();
@@ -545,6 +566,16 @@ export default function LoanList() {
           loan={loans.find(l => l.id === viewingDocLoanId) || null}
           isOpen={!!viewingDocLoanId}
           onClose={() => setViewingDocLoanId(null)}
+        />
+      )}
+
+      {viewingBreakdownLoanId && (
+        <PaymentBreakdownModal
+          loan={loans.find(l => l.id === viewingBreakdownLoanId) || null}
+          isOpen={!!viewingBreakdownLoanId}
+          onClose={() => setViewingBreakdownLoanId(null)}
+          onRecordPayment={(loanId) => setSelectedLoanId(loanId)}
+          onDeclareBalance={(loanId) => setDeclaringLoanId(loanId)}
         />
       )}
 

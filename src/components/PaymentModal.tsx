@@ -12,16 +12,18 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { Camera, Upload, X, CheckCircle, Trash2, ShieldCheck, History, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Camera, Upload, X, CheckCircle, Trash2, ShieldCheck, History, ArrowRight, AlertTriangle, FileText, Receipt } from 'lucide-react';
 import { 
   getLoanStatus, 
   calculateCurrentDeclaredDetails, 
   getRemainingBalance, 
   getActiveLoanPayments,
-  getLoanOverdueDetails 
+  getLoanOverdueDetails,
+  getLoanStatementOfAccount
 } from '../lib/calculations';
 import { getPhilippineYMD, getPhilippineMidnightDate, formatPHTDate } from '../lib/phtDate';
 import { ConfirmDialog } from './ConfirmDialog';
+import PaymentBreakdownModal from './PaymentBreakdownModal';
 
 interface PaymentModalProps {
   loanId: string;
@@ -42,6 +44,7 @@ export default function PaymentModal({ loanId, onClose, initialApplyPenalty }: P
   const [isEarlySettlementSelected, setIsEarlySettlementSelected] = useState(loan?.isEarlySettlement || false);
   const [shouldDeclareRemainingBalance, setShouldDeclareRemainingBalance] = useState(false);
   const [showDeclarationHistory, setShowDeclarationHistory] = useState(false);
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
 
   // Overdue & Late Penalty State
   const selectedDate = getPhilippineMidnightDate(date);
@@ -392,6 +395,45 @@ export default function PaymentModal({ loanId, onClose, initialApplyPenalty }: P
           </div>
 
           <div className="space-y-6">
+            {/* Statement of Account Quick Summary */}
+            {(() => {
+              const soa = getLoanStatementOfAccount(loan, payments);
+              return (
+                <div className="p-3.5 bg-card/90 border border-primary/20 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Receipt className="h-3.5 w-3.5 text-primary" />
+                      Payment Allocation Summary
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowBreakdownModal(true)}
+                      className="h-6 px-2 text-[10px] bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 font-bold"
+                    >
+                      <FileText className="h-3 w-3 mr-1" /> Full Statement (SOA)
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-2 bg-background/50 rounded-lg border border-zinc-800">
+                      <span className="text-[10px] text-zinc-400 block">Principal Paid</span>
+                      <span className="font-bold text-white">₱{soa.totalPrincipalPaid.toLocaleString()}</span>
+                    </div>
+                    <div className="p-2 bg-amber-950/20 rounded-lg border border-amber-500/20">
+                      <span className="text-[10px] text-amber-400 block">Interest Paid</span>
+                      <span className="font-bold text-amber-400">₱{soa.totalInterestPaid.toLocaleString()}</span>
+                    </div>
+                    <div className="p-2 bg-primary/5 rounded-lg border border-primary/20">
+                      <span className="text-[10px] text-zinc-400 block">Remaining Balance</span>
+                      <span className="font-bold text-primary">₱{soa.currentRemainingBalance.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-zinc-300 uppercase tracking-wider">Payment History</h3>
               {loan.declarationHistory && loan.declarationHistory.length > 0 && (
@@ -495,6 +537,14 @@ export default function PaymentModal({ loanId, onClose, initialApplyPenalty }: P
         onConfirm={handleDeletePayment}
         confirmText="Delete Payment"
       />
+
+      {showBreakdownModal && (
+        <PaymentBreakdownModal
+          loan={loan}
+          isOpen={showBreakdownModal}
+          onClose={() => setShowBreakdownModal(false)}
+        />
+      )}
     </Dialog>
   );
 }
