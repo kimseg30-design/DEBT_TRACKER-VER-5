@@ -9,7 +9,7 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Loan } from '../types';
-import { formatPHTDate, formatPHTDateTime, getPhilippineMidnightDate } from '../lib/phtDate';
+import { formatPHTDate } from '../lib/phtDate';
 import { calculateLoanDetails, getFirstPaymentDate, getMaturityDate, getAmortizationSchedule } from '../lib/calculations';
 import { numberToWords } from '../lib/numberToWords';
 import { 
@@ -18,13 +18,11 @@ import {
   CheckCircle2, 
   ShieldCheck, 
   FileCheck, 
-  Download, 
   Copy, 
   ExternalLink,
   Layers,
-  ArrowRight,
-  Calendar,
-  Clock
+  Sparkles,
+  Maximize2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -46,6 +44,7 @@ export default function LoanDocumentsModal({
   onAddAnother,
 }: LoanDocumentsModalProps) {
   const [activeTab, setActiveTab] = useState<DocumentTab>('all');
+  const [isPrinting, setIsPrinting] = useState(false);
   const printContainerRef = useRef<HTMLDivElement>(null);
 
   if (!loan) return null;
@@ -79,8 +78,176 @@ export default function LoanDocumentsModal({
   const totalAmountWords = numberToWords(calc.totalAmount);
   const formattedRefId = `DF-${id.slice(0, 8).toUpperCase()}`;
 
+  // Generate self-contained standalone HTML for pristine direct printing / export
+  const generatePrintHTML = () => {
+    if (!printContainerRef.current) return '';
+    const content = printContainerRef.current.innerHTML;
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DebtFlow_Loan_Documents_${formattedRefId}_${borrowerName.replace(/\s+/g, '_')}</title>
+  <style>
+    @page {
+      size: portrait;
+      margin: 12mm 12mm 15mm 12mm;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: #ffffff !important;
+      color: #09090b !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 10pt;
+      line-height: 1.45;
+      padding: 0;
+      margin: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .print-doc-container {
+      background: #ffffff;
+      color: #09090b;
+      border: 1.5px solid #18181b;
+      border-radius: 4px;
+      padding: 22px 26px;
+      margin-bottom: 24px;
+      width: 100%;
+      page-break-after: always;
+      break-after: page;
+      page-break-inside: auto;
+    }
+    .print-doc-container:last-child {
+      page-break-after: auto;
+      break-after: auto;
+      margin-bottom: 0;
+    }
+    .space-y-6 > * + * { margin-top: 18px; }
+    .space-y-4 > * + * { margin-top: 12px; }
+    .space-y-3 > * + * { margin-top: 10px; }
+    .space-y-2 > * + * { margin-top: 8px; }
+    .space-y-1 > * + * { margin-top: 4px; }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9pt;
+      margin-top: 4px;
+    }
+    thead {
+      display: table-header-group;
+    }
+    tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    th, td {
+      padding: 5px 8px;
+      border: 1px solid #d4d4d8;
+      text-align: left;
+    }
+    th {
+      background-color: #f4f4f5;
+      font-weight: 700;
+    }
+    .bg-zinc-50 { background-color: #fafafa; }
+    .bg-zinc-100 { background-color: #f4f4f5; }
+    .bg-amber-50 { background-color: #fffbeb; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .font-bold { font-weight: 700; }
+    .font-semibold { font-weight: 600; }
+    .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .uppercase { text-transform: uppercase; }
+    .border-b-2 { border-bottom: 2px solid #18181b; }
+    .border-t { border-top: 1px solid #d4d4d8; }
+    .grid { display: flex; gap: 16px; }
+    .grid > div { flex: 1; }
+    .print-avoid-break {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .no-print, style { display: none !important; }
+    .overflow-y-auto, .max-h-56 {
+      max-height: none !important;
+      overflow: visible !important;
+    }
+  </style>
+</head>
+<body>
+  ${content}
+</body>
+</html>`;
+  };
+
+  // High-reliability isolated print method using a clean hidden iframe
   const handlePrint = () => {
-    window.print();
+    setIsPrinting(true);
+    try {
+      // Create a hidden iframe for isolated print
+      const existingIframe = document.getElementById('debtflow-print-frame');
+      if (existingIframe) {
+        existingIframe.remove();
+      }
+
+      const iframe = document.createElement('iframe');
+      iframe.id = 'debtflow-print-frame';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.visibility = 'hidden';
+      document.body.appendChild(iframe);
+
+      const printHtml = generatePrintHTML();
+      const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument;
+
+      if (iframeDoc) {
+        iframeDoc.open();
+        iframeDoc.write(printHtml);
+        iframeDoc.close();
+
+        // Give browser time to parse CSS and render
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            setIsPrinting(false);
+          } catch (e) {
+            console.warn('Iframe print fallback to window.print', e);
+            window.print();
+            setIsPrinting(false);
+          }
+        }, 300);
+      } else {
+        window.print();
+        setIsPrinting(false);
+      }
+    } catch (err) {
+      console.error('Print error, falling back to window.print', err);
+      window.print();
+      setIsPrinting(false);
+    }
+  };
+
+  // Open clean printable document in a new tab for native full-page PDF save or review
+  const handleOpenCleanPrintView = () => {
+    const printHtml = generatePrintHTML();
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(printHtml);
+      printWindow.document.close();
+      toast.success('Clean document view opened in a new tab');
+    } else {
+      toast.info('Popup blocked. Use the Print button directly.');
+    }
   };
 
   const handleCopySummary = () => {
@@ -106,9 +273,12 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col bg-card border-primary/20 text-white p-0 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)] print:bg-white print:text-black print:border-none print:shadow-none print:max-w-none print:max-h-none print:p-0">
+      <DialogContent 
+        id="loan-documents-dialog"
+        className="max-w-4xl max-h-[92vh] flex flex-col bg-card border-primary/20 text-white p-0 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)] print:bg-white print:text-black print:border-none print:shadow-none print:max-w-none print:max-h-none print:p-0"
+      >
         {/* Modal Top Header (Hidden when printing) */}
-        <div className="p-5 border-b border-primary/10 bg-background/80 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
+        <div className="p-5 border-b border-primary/10 bg-background/90 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
               <FileCheck className="h-6 w-6" />
@@ -132,19 +302,30 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
             <Button
               variant="outline"
               size="sm"
+              onClick={handleOpenCleanPrintView}
+              className="border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs h-9"
+              title="Open full-page clean printable view in new tab"
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+              Open Clean Tab
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleCopySummary}
               className="border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs h-9"
               title="Copy text summary"
             >
               <Copy className="h-3.5 w-3.5 mr-1.5" />
-              Copy
+              Copy Text
             </Button>
             <Button
               onClick={handlePrint}
+              disabled={isPrinting}
               className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs h-9 px-4 shadow-[0_0_15px_rgba(var(--primary),0.3)] gap-1.5"
             >
               <Printer className="h-4 w-4" />
-              <span>Print Documents</span>
+              <span>{isPrinting ? 'Preparing Print...' : 'Print Documents'}</span>
             </Button>
           </div>
         </div>
@@ -171,92 +352,78 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
           </div>
         )}
 
-        {/* Document Selection Tabs (Hidden when printing) */}
-        <div className="px-5 pt-3 pb-2 bg-background/40 border-b border-zinc-800/80 flex items-center gap-2 overflow-x-auto print:hidden text-xs">
-          <button
-            type="button"
-            onClick={() => setActiveTab('all')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
-              activeTab === 'all'
-                ? 'bg-primary/20 text-primary border border-primary/30'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <Layers className="h-3.5 w-3.5" />
-            <span>All Documents (Combined)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('agreement')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
-              activeTab === 'agreement'
-                ? 'bg-primary/20 text-primary border border-primary/30'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <FileText className="h-3.5 w-3.5" />
-            <span>1. Loan Agreement (Paper)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('disclosure')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
-              activeTab === 'disclosure'
-                ? 'bg-primary/20 text-primary border border-primary/30'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>2. Disclosure Statement</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('promissory')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
-              activeTab === 'promissory'
-                ? 'bg-primary/20 text-primary border border-primary/30'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <FileCheck className="h-3.5 w-3.5" />
-            <span>3. Promissory Note</span>
-          </button>
+        {/* Document Selection Tabs & Page Fit Indicator (Hidden when printing) */}
+        <div className="px-5 pt-3 pb-2.5 bg-background/60 border-b border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 print:hidden text-xs">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setActiveTab('all')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+                activeTab === 'all'
+                  ? 'bg-primary/20 text-primary border border-primary/30'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span>All 3 Documents (Complete Set)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('agreement')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+                activeTab === 'agreement'
+                  ? 'bg-primary/20 text-primary border border-primary/30'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span>1. Loan Agreement</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('disclosure')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+                activeTab === 'disclosure'
+                  ? 'bg-primary/20 text-primary border border-primary/30'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>2. Disclosure Statement</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('promissory')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
+                activeTab === 'promissory'
+                  ? 'bg-primary/20 text-primary border border-primary/30'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <FileCheck className="h-3.5 w-3.5" />
+              <span>3. Promissory Note</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] text-zinc-400 shrink-0">
+            <span className="inline-flex items-center gap-1 bg-zinc-900 border border-zinc-800 px-2 py-1 rounded text-zinc-300">
+              <Sparkles className="h-3 w-3 text-primary" />
+              <span>Auto-fit to Pages • No Scrollbars</span>
+            </span>
+          </div>
         </div>
 
-        {/* Scrollable Printable Document Canvas */}
+        {/* Printable Document Container */}
         <div 
           ref={printContainerRef}
-          className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 bg-zinc-950/60 print:bg-white print:text-black print:p-0 print:space-y-12 print:overflow-visible"
+          id="printable-loan-documents"
+          className="print-document-wrapper flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 bg-zinc-950/60 print:bg-white print:text-black print:p-0 print:space-y-12 print:overflow-visible"
         >
-          {/* Printable CSS override styling */}
-          <style>{`
-            @media print {
-              body {
-                background: white !important;
-                color: black !important;
-              }
-              .print-doc-container {
-                background: white !important;
-                color: black !important;
-                border: 1px solid #000 !important;
-                box-shadow: none !important;
-                page-break-after: always;
-                margin-bottom: 2cm;
-              }
-              .print-doc-container:last-child {
-                page-break-after: auto;
-              }
-              .no-print {
-                display: none !important;
-              }
-            }
-          `}</style>
-
           {/* ========================================================================= */}
-          {/* DOCUMENT 1: LOAN AGREEMENT / LOAN PAPER */}
+          {/* DOCUMENT 1: LOAN AGREEMENT / LOAN CONTRACT */}
           {/* ========================================================================= */}
           {(activeTab === 'all' || activeTab === 'agreement') && (
-            <div className="print-doc-container bg-white text-zinc-900 rounded-xl p-6 sm:p-10 shadow-2xl border border-zinc-200 text-xs sm:text-sm font-sans space-y-6">
+            <div className="print-doc-container bg-white text-zinc-900 rounded-xl p-6 sm:p-10 shadow-2xl border border-zinc-300 text-xs sm:text-sm font-sans space-y-6">
               {/* Header */}
               <div className="border-b-2 border-zinc-900 pb-4 text-center space-y-1">
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight uppercase text-zinc-950">
@@ -265,7 +432,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                 <p className="text-[11px] font-semibold text-zinc-600 uppercase tracking-wider">
                   DebtFlow Credit & Financial Services
                 </p>
-                <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-2 font-mono">
+                <div className="flex justify-between items-center text-[10px] text-zinc-600 pt-2 font-mono">
                   <span>LOAN REF: <strong>{formattedRefId}</strong></span>
                   <span>DATE: <strong>{formatPHTDate(startDate)}</strong></span>
                   <span>TYPE: <strong>{loanType} ({loanGroup} Group)</strong></span>
@@ -273,12 +440,12 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               </div>
 
               {/* Parties */}
-              <div className="space-y-2 text-zinc-800 leading-relaxed">
+              <div className="space-y-2 text-zinc-800 leading-relaxed print-avoid-break">
                 <p>
                   This Loan Agreement (the <strong>"Agreement"</strong>) is entered into and made effective as of{' '}
                   <strong>{formatPHTDate(startDate)}</strong>, by and between:
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-50 p-4 rounded-lg border border-zinc-200 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-50 p-4 rounded-lg border border-zinc-300 text-xs">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-zinc-500 block">LENDER / CREDITOR:</span>
                     <strong className="text-zinc-900 text-sm">DebtFlow Financial Services</strong>
@@ -293,7 +460,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               </div>
 
               {/* Financial Terms Table */}
-              <div className="space-y-2">
+              <div className="space-y-2 print-avoid-break">
                 <h3 className="font-bold text-zinc-900 uppercase text-xs tracking-wider">
                   I. Financial Terms & Schedule of Repayment
                 </h3>
@@ -361,15 +528,15 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                 </div>
               </div>
 
-              {/* Installment Breakdown Table in Agreement */}
+              {/* Installment Breakdown Table in Agreement (Unfurled in print, no scrollbar) */}
               {schedule.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="font-bold text-zinc-900 uppercase text-xs tracking-wider">
-                    Schedule of Installment Dues
+                    Schedule of Installment Dues (All {schedule.length} Installments)
                   </h3>
-                  <div className="border border-zinc-200 rounded-lg overflow-hidden max-h-56 overflow-y-auto">
+                  <div className="border border-zinc-300 rounded-lg max-h-56 overflow-y-auto print:max-h-none print:overflow-visible">
                     <table className="w-full text-left text-[11px] border-collapse">
-                      <thead className="bg-zinc-100 text-zinc-700 sticky top-0 font-semibold border-b border-zinc-200">
+                      <thead className="bg-zinc-100 text-zinc-800 font-semibold border-b border-zinc-300 sticky top-0 print:static">
                         <tr>
                           <th className="p-2">#</th>
                           <th className="p-2">Due Date</th>
@@ -381,17 +548,28 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                       </thead>
                       <tbody className="divide-y divide-zinc-200 font-mono">
                         {schedule.map((item) => (
-                          <tr key={item.installmentNumber} className={item.installmentNumber === 1 ? 'bg-amber-50/40 font-semibold text-zinc-950' : 'hover:bg-zinc-50 text-zinc-800'}>
+                          <tr 
+                            key={item.installmentNumber} 
+                            className={item.installmentNumber === 1 ? 'bg-amber-50/60 font-semibold text-zinc-950' : 'hover:bg-zinc-50 text-zinc-800'}
+                          >
                             <td className="p-2">{item.installmentNumber}</td>
                             <td className="p-2 font-sans font-medium">
                               {formatPHTDate(item.dueDate)}
-                              {item.installmentNumber === 1 && <span className="ml-1.5 text-[9px] bg-amber-200 text-amber-800 px-1 py-0.5 rounded font-sans font-bold uppercase">1st Payment</span>}
-                              {item.installmentNumber === schedule.length && <span className="ml-1.5 text-[9px] bg-zinc-200 text-zinc-700 px-1 py-0.5 rounded font-sans font-bold uppercase">Maturity</span>}
+                              {item.installmentNumber === 1 && (
+                                <span className="ml-1.5 text-[9px] bg-amber-200 text-amber-900 px-1 py-0.5 rounded font-sans font-bold uppercase print:border print:border-amber-400">
+                                  1st Payment
+                                </span>
+                              )}
+                              {item.installmentNumber === schedule.length && (
+                                <span className="ml-1.5 text-[9px] bg-zinc-200 text-zinc-800 px-1 py-0.5 rounded font-sans font-bold uppercase print:border print:border-zinc-400">
+                                  Maturity
+                                </span>
+                              )}
                             </td>
-                            <td className="p-2 text-right font-bold">₱{item.installmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td className="p-2 text-right text-zinc-600">₱{item.principalPortion.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td className="p-2 text-right text-zinc-600">₱{item.interestPortion.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td className="p-2 text-right text-zinc-600">₱{item.remainingBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right font-bold text-zinc-950">₱{item.installmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right text-zinc-700">₱{item.principalPortion.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right text-zinc-700">₱{item.interestPortion.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="p-2 text-right text-zinc-700">₱{item.remainingBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -401,7 +579,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               )}
 
               {/* Terms and Conditions */}
-              <div className="space-y-2 text-zinc-700 text-xs leading-relaxed">
+              <div className="space-y-2 text-zinc-700 text-xs leading-relaxed print-avoid-break">
                 <h3 className="font-bold text-zinc-900 uppercase text-xs tracking-wider">
                   II. Terms, Default & Late Penalty
                 </h3>
@@ -427,7 +605,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               </div>
 
               {/* Signatures */}
-              <div className="pt-8 border-t border-zinc-300 space-y-6">
+              <div className="pt-8 border-t border-zinc-300 space-y-6 print-signature-section print-avoid-break">
                 <p className="text-[11px] italic text-zinc-600 text-center">
                   IN WITNESS WHEREOF, the parties hereto have executed this Loan Agreement as of the date first above written.
                 </p>
@@ -436,21 +614,21 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                   <div className="text-center space-y-1">
                     <div className="border-b-2 border-zinc-900 h-12 w-48 sm:w-64 mx-auto"></div>
                     <p className="font-bold text-zinc-950 uppercase text-xs">{borrowerName}</p>
-                    <p className="text-[10px] text-zinc-500">Signature of Borrower over Printed Name</p>
-                    <p className="text-[10px] text-zinc-400">Date: ________________________</p>
+                    <p className="text-[10px] text-zinc-600">Signature of Borrower over Printed Name</p>
+                    <p className="text-[10px] text-zinc-500">Date: ________________________</p>
                   </div>
 
                   <div className="text-center space-y-1">
                     <div className="border-b-2 border-zinc-900 h-12 w-48 sm:w-64 mx-auto"></div>
                     <p className="font-bold text-zinc-950 uppercase text-xs">AUTHORIZED REPRESENTATIVE</p>
-                    <p className="text-[10px] text-zinc-500">DebtFlow Loan Officer / Creditor</p>
-                    <p className="text-[10px] text-zinc-400">Date: ________________________</p>
+                    <p className="text-[10px] text-zinc-600">DebtFlow Loan Officer / Creditor</p>
+                    <p className="text-[10px] text-zinc-500">Date: ________________________</p>
                   </div>
                 </div>
 
                 <div className="pt-2 text-center">
                   <div className="border-b border-zinc-400 h-10 w-48 sm:w-64 mx-auto"></div>
-                  <p className="text-[10px] text-zinc-500 mt-1">Co-Maker / Witness Signature over Printed Name</p>
+                  <p className="text-[10px] text-zinc-600 mt-1">Co-Maker / Witness Signature over Printed Name</p>
                 </div>
               </div>
             </div>
@@ -460,7 +638,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
           {/* DOCUMENT 2: DISCLOSURE STATEMENT (TRUTH IN LENDING ACT - RA 3765) */}
           {/* ========================================================================= */}
           {(activeTab === 'all' || activeTab === 'disclosure') && (
-            <div className="print-doc-container bg-white text-zinc-900 rounded-xl p-6 sm:p-10 shadow-2xl border border-zinc-200 text-xs sm:text-sm font-sans space-y-6">
+            <div className="print-doc-container bg-white text-zinc-900 rounded-xl p-6 sm:p-10 shadow-2xl border border-zinc-300 text-xs sm:text-sm font-sans space-y-6">
               {/* Header */}
               <div className="border-b-2 border-zinc-900 pb-4 text-center space-y-1">
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight uppercase text-zinc-950">
@@ -469,14 +647,14 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                 <p className="text-[11px] font-semibold text-zinc-600 uppercase tracking-wider">
                   (In Compliance with Republic Act No. 3765 - Truth in Lending Act)
                 </p>
-                <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-2 font-mono">
+                <div className="flex justify-between items-center text-[10px] text-zinc-600 pt-2 font-mono">
                   <span>STATEMENT NO: <strong>DS-{formattedRefId}</strong></span>
                   <span>DATE: <strong>{formatPHTDate(startDate)}</strong></span>
                 </div>
               </div>
 
               {/* Borrower Info */}
-              <div className="bg-zinc-50 p-3.5 rounded-lg border border-zinc-200 grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-zinc-50 p-3.5 rounded-lg border border-zinc-300 grid grid-cols-2 gap-2 text-xs print-avoid-break">
                 <div>
                   <span className="text-zinc-500 text-[10px] uppercase font-bold block">Borrower Name:</span>
                   <strong className="text-zinc-900">{borrowerName}</strong>
@@ -488,7 +666,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               </div>
 
               {/* Itemized Disclosure Breakdown */}
-              <div className="space-y-3">
+              <div className="space-y-3 print-avoid-break">
                 <div className="border border-zinc-300 rounded-lg overflow-hidden">
                   <table className="w-full text-xs border-collapse">
                     <thead>
@@ -507,13 +685,13 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                       <tr className="bg-zinc-50">
                         <td className="p-2.5 pl-6 text-zinc-700">
                           2. Finance Charges:
-                          <div className="text-[11px] text-zinc-500 pl-3">
+                          <div className="text-[11px] text-zinc-600 pl-3">
                             • Nominal Monthly Interest Rate: {interestRate}% / month<br />
                             • Total Interest over {durationMonths} month(s) term: ₱{calc.totalInterest.toLocaleString(undefined, { minimumFractionDigits: 2 })}<br />
                             • Processing & Documentation Fees: ₱0.00 (Waived)
                           </div>
                         </td>
-                        <td className="p-2.5 text-right font-mono text-zinc-900 align-top">
+                        <td className="p-2.5 text-right font-mono text-zinc-900 align-top font-semibold">
                           ₱{calc.totalInterest.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
                       </tr>
@@ -527,9 +705,9 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                           ₱{calc.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
                       </tr>
-                      <tr className="bg-emerald-50/50">
+                      <tr className="bg-emerald-50/70">
                         <td className="p-2.5 font-bold text-zinc-900">5. Net Proceeds of Loan Disbursed to Borrower</td>
-                        <td className="p-2.5 text-right font-mono font-bold text-emerald-700 text-sm">
+                        <td className="p-2.5 text-right font-mono font-bold text-emerald-800 text-sm">
                           ₱{principal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
                       </tr>
@@ -539,12 +717,12 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               </div>
 
               {/* Schedule of Installments */}
-              <div className="space-y-2 text-xs text-zinc-800">
+              <div className="space-y-2 text-xs text-zinc-800 print-avoid-break">
                 <h3 className="font-bold text-zinc-900 uppercase text-xs tracking-wider">
                   6. Schedule of Installment Payments
                 </h3>
-                <div className="bg-zinc-50 p-3.5 rounded-lg border border-zinc-200 space-y-2">
-                  <p className="font-mono text-xs leading-relaxed">
+                <div className="bg-zinc-50 p-3.5 rounded-lg border border-zinc-300 space-y-2">
+                  <p className="font-mono text-xs leading-relaxed text-zinc-900">
                     Payable in <strong>{calc.installments} installments</strong> of{' '}
                     <strong>₱{calc.installmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> every{' '}
                     <strong>{frequency}</strong>, with the <strong>First Payment Due on {formatPHTDate(firstPaymentDate)}</strong>, and succeeding installments due every {frequency.toLowerCase()} thereafter until the final installment on or before{' '}
@@ -555,8 +733,8 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                       <span className="text-zinc-500 block text-[9px] uppercase font-sans">Date Granted</span>
                       <strong className="text-zinc-900">{formatPHTDate(startDate)}</strong>
                     </div>
-                    <div className="bg-amber-50 p-2 rounded border border-amber-200">
-                      <span className="text-amber-700 block text-[9px] uppercase font-sans font-bold">1st Payment Due</span>
+                    <div className="bg-amber-50 p-2 rounded border border-amber-300">
+                      <span className="text-amber-800 block text-[9px] uppercase font-sans font-bold">1st Payment Due</span>
                       <strong className="text-amber-950 font-bold">{formatPHTDate(firstPaymentDate)}</strong>
                     </div>
                     <div className="bg-white p-2 rounded border border-zinc-200">
@@ -568,7 +746,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               </div>
 
               {/* Additional Penalties */}
-              <div className="space-y-1 text-xs text-zinc-700">
+              <div className="space-y-1 text-xs text-zinc-700 print-avoid-break">
                 <h3 className="font-bold text-zinc-900 uppercase text-xs tracking-wider">
                   7. Additional Charges in Case of Late Payment
                 </h3>
@@ -579,8 +757,8 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               </div>
 
               {/* Borrower Acknowledgment */}
-              <div className="pt-6 border-t border-zinc-300 space-y-4">
-                <div className="p-3 bg-zinc-100 rounded-lg border border-zinc-300 text-[11px] leading-relaxed text-zinc-800 font-medium text-center uppercase">
+              <div className="pt-6 border-t border-zinc-300 space-y-4 print-signature-section print-avoid-break">
+                <div className="p-3 bg-zinc-100 rounded-lg border border-zinc-300 text-[11px] leading-relaxed text-zinc-900 font-medium text-center uppercase">
                   "I ACKNOWLEDGE RECEIPT OF A COPY OF THIS DISCLOSURE STATEMENT PRIOR TO THE CONSUMMATION OF THE CREDIT TRANSACTION AND THAT I HAVE READ AND FULLY UNDERSTOOD THE CONTENTS THEREOF."
                 </div>
 
@@ -588,15 +766,15 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                   <div className="text-center space-y-1">
                     <div className="border-b-2 border-zinc-900 h-12 w-48 sm:w-64 mx-auto"></div>
                     <p className="font-bold text-zinc-950 uppercase text-xs">{borrowerName}</p>
-                    <p className="text-[10px] text-zinc-500">Signature of Borrower over Printed Name</p>
-                    <p className="text-[10px] text-zinc-400">Date Received: ________________________</p>
+                    <p className="text-[10px] text-zinc-600">Signature of Borrower over Printed Name</p>
+                    <p className="text-[10px] text-zinc-500">Date Received: ________________________</p>
                   </div>
 
                   <div className="text-center space-y-1">
                     <div className="border-b-2 border-zinc-900 h-12 w-48 sm:w-64 mx-auto"></div>
                     <p className="font-bold text-zinc-950 uppercase text-xs">CREDIT OFFICER / WITNESS</p>
-                    <p className="text-[10px] text-zinc-500">DebtFlow Lending Operations</p>
-                    <p className="text-[10px] text-zinc-400">Date: ________________________</p>
+                    <p className="text-[10px] text-zinc-600">DebtFlow Lending Operations</p>
+                    <p className="text-[10px] text-zinc-500">Date: ________________________</p>
                   </div>
                 </div>
               </div>
@@ -607,7 +785,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
           {/* DOCUMENT 3: PROMISSORY NOTE (KATIBAYAN NG PAGKAKAUTANG) */}
           {/* ========================================================================= */}
           {(activeTab === 'all' || activeTab === 'promissory') && (
-            <div className="print-doc-container bg-white text-zinc-900 rounded-xl p-6 sm:p-10 shadow-2xl border border-zinc-200 text-xs sm:text-sm font-sans space-y-6">
+            <div className="print-doc-container bg-white text-zinc-900 rounded-xl p-6 sm:p-10 shadow-2xl border border-zinc-300 text-xs sm:text-sm font-sans space-y-6">
               {/* Header */}
               <div className="border-b-2 border-zinc-900 pb-4 text-center space-y-1">
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight uppercase text-zinc-950">
@@ -616,7 +794,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
                 <p className="text-[11px] font-semibold text-zinc-600 uppercase tracking-wider">
                   (Katibayan ng Pagkakautang at Pangakong Pagbabayad)
                 </p>
-                <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-2 font-mono">
+                <div className="flex justify-between items-center text-[10px] text-zinc-600 pt-2 font-mono">
                   <span>NOTE NO: <strong>PN-{formattedRefId}</strong></span>
                   <span>DATE OF NOTE: <strong>{formatPHTDate(startDate)}</strong></span>
                   <span>AMOUNT: <strong>₱{calc.totalAmount.toLocaleString()}</strong></span>
@@ -624,7 +802,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               </div>
 
               {/* Body of Note */}
-              <div className="space-y-4 text-zinc-800 text-xs sm:text-sm leading-relaxed text-justify">
+              <div className="space-y-4 text-zinc-800 text-xs sm:text-sm leading-relaxed text-justify print-avoid-break">
                 <p>
                   <strong>FOR VALUE RECEIVED</strong>, the undersigned (the <strong>"Maker / Borrower"</strong>),{' '}
                   <strong className="text-zinc-950 uppercase">{borrowerName}</strong>, hereby unconditionally promises to pay to the order of{' '}
@@ -656,26 +834,26 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
               </div>
 
               {/* Signatures */}
-              <div className="pt-10 border-t border-zinc-300 space-y-6">
+              <div className="pt-10 border-t border-zinc-300 space-y-6 print-signature-section print-avoid-break">
                 <div className="grid grid-cols-2 gap-8">
                   <div className="text-center space-y-1">
                     <div className="border-b-2 border-zinc-900 h-14 w-48 sm:w-64 mx-auto"></div>
                     <p className="font-bold text-zinc-950 uppercase text-xs">{borrowerName}</p>
-                    <p className="text-[10px] text-zinc-500">Maker / Borrower (Lagda ng Nangutang)</p>
-                    <p className="text-[10px] text-zinc-400">Govt ID / Contact: ________________________</p>
+                    <p className="text-[10px] text-zinc-600">Maker / Borrower (Lagda ng Nangutang)</p>
+                    <p className="text-[10px] text-zinc-500">Govt ID / Contact: ________________________</p>
                   </div>
 
                   <div className="text-center space-y-1">
                     <div className="border-b-2 border-zinc-900 h-14 w-48 sm:w-64 mx-auto"></div>
                     <p className="font-bold text-zinc-950 uppercase text-xs">CO-MAKER / GUARANTOR</p>
-                    <p className="text-[10px] text-zinc-500">Signature over Printed Name</p>
-                    <p className="text-[10px] text-zinc-400">Govt ID / Contact: ________________________</p>
+                    <p className="text-[10px] text-zinc-600">Signature over Printed Name</p>
+                    <p className="text-[10px] text-zinc-500">Govt ID / Contact: ________________________</p>
                   </div>
                 </div>
 
                 <div className="pt-4 text-center">
                   <div className="border-b border-zinc-400 h-10 w-48 sm:w-64 mx-auto"></div>
-                  <p className="text-[10px] text-zinc-500 mt-1">Authorized Witness / Loan Officer Signature</p>
+                  <p className="text-[10px] text-zinc-600 mt-1">Authorized Witness / Loan Officer Signature</p>
                 </div>
               </div>
             </div>
@@ -686,7 +864,7 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
         <div className="p-4 border-t border-zinc-800 bg-background/90 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs print:hidden">
           <div className="flex items-center gap-2 text-zinc-400">
             <Printer className="h-4 w-4 text-primary" />
-            <span>Ready for standard letter/A4 printing or PDF export.</span>
+            <span>Ready for standard letter/A4 printing, PDF export, or direct signing.</span>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -700,10 +878,11 @@ Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace p
             </Button>
             <Button
               onClick={handlePrint}
+              disabled={isPrinting}
               className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
             >
               <Printer className="h-4 w-4 mr-1.5" />
-              Print Selected
+              {isPrinting ? 'Opening Print...' : 'Print Selected'}
             </Button>
           </div>
         </div>

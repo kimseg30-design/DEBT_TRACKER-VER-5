@@ -121,3 +121,149 @@
   border-color: oklch(0.75 0.35 190 / 0.5);
   box-shadow: 0 0 10px oklch(0.75 0.35 190 / 0.2);
 }
+
+/* ========================================================================= */
+/* PRINT MEDIA STYLES - FLAWLESS MULTI-PAGE DOCUMENT PRINTING & PDF EXPORT */
+/* ========================================================================= */
+@media print {
+  @page {
+    size: auto;
+    margin: 12mm 12mm 15mm 12mm;
+  }
+
+  html, 
+  body {
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #09090b !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide entire application shell and dark backdrop */
+  #root,
+  aside,
+  header,
+  nav,
+  [data-slot="dialog-overlay"],
+  .no-print,
+  [data-sonner-toaster] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Ensure Dialog Portal and Content flow naturally like a standard print document */
+  [data-slot="dialog-portal"] {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  [data-slot="dialog-content"] {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #09090b !important;
+    inset: auto !important;
+  }
+
+  /* Printable container resets */
+  .print-document-wrapper,
+  .print-document-canvas {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    width: 100% !important;
+  }
+
+  .print-doc-container {
+    background: #ffffff !important;
+    color: #09090b !important;
+    border: 1.5px solid #27272a !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    padding: 20px 24px !important;
+    margin-bottom: 28px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: auto !important;
+  }
+
+  .print-doc-container:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Unfurl all scrollable tables & remove scrollbars */
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-hidden,
+  .max-h-56,
+  .max-h-96,
+  .max-h-screen {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Avoid breaking inside important blocks */
+  .print-avoid-break,
+  .print-keep-together,
+  table,
+  tbody,
+  tr,
+  .print-signature-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Table styling in print */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  th, td {
+    padding: 4px 6px !important;
+    font-size: 9.5pt !important;
+  }
+
+  /* High contrast border colors for crisp printer ink */
+  .border-zinc-200,
+  .border-zinc-300,
+  .border-zinc-400 {
+    border-color: #a1a1aa !important;
+  }
+}
