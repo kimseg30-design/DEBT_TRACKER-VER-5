@@ -230,22 +230,97 @@ export function getPaymentProgress(
   return Math.min(100, (totalPaid / declaredTotalAmount) * 100);
 }
 
-export function calculateLatePenalty(loan: Loan, payments: Payment[], currentDate: Date = getPhilippineNow()): number {
-  const { rate, gracePeriod } = loan.latePenalty;
-  if (rate <= 0) return 0;
+export interface LoanOverdueDetails {
+  isOverdue: boolean;
+  daysOverdue: number;
+  missedPeriods: number;
+  penaltyRate: number;
+  gracePeriod: number;
+  accruedPenaltyAmount: number;
+  penaltiesPaid: number;
+  pendingPenaltyAmount: number;
+  lastPaymentDate: string | null;
+  expectedDueDate: string;
+}
+
+export function getLoanOverdueDetails(
+  loan: Loan, 
+  payments: Payment[], 
+  currentDate: Date = getPhilippineNow()
+): LoanOverdueDetails {
+  const rate = loan.latePenalty?.rate ?? 2;
+  const gracePeriod = loan.latePenalty?.gracePeriod ?? 3;
+  const remaining = getRemainingBalance(loan, payments, currentDate);
+  
+  const allLoanPayments = payments.filter(p => p.loanId === loan.id);
+  const penaltiesPaid = allLoanPayments.reduce((sum, p) => sum + (p.penaltyPaid || 0), 0);
+
+  if (loan.status === 'Fully Paid' || remaining <= 0) {
+    return {
+      isOverdue: false,
+      daysOverdue: 0,
+      missedPeriods: 0,
+      penaltyRate: rate,
+      gracePeriod,
+      accruedPenaltyAmount: 0,
+      penaltiesPaid,
+      pendingPenaltyAmount: 0,
+      lastPaymentDate: allLoanPayments.length > 0 ? allLoanPayments[allLoanPayments.length - 1].date : null,
+      expectedDueDate: loan.startDate,
+    };
+  }
 
   const frequencyDays = loan.frequency === 'Weekly' ? 7 : loan.frequency === 'Biweekly' ? 14 : 30;
   const activePayments = getActiveLoanPayments(loan.id, payments);
-  const lastActivityDate = activePayments.length > 0 
-    ? getPhilippineMidnightDate(Math.max(...activePayments.map(p => new Date(p.date).getTime())))
-    : getPhilippineMidnightDate(loan.startDate);
-
-  const daysSinceLastActivity = differenceInDays(getPhilippineMidnightDate(currentDate), lastActivityDate);
   
-  if (daysSinceLastActivity > (frequencyDays + gracePeriod)) {
-    const overdueDays = daysSinceLastActivity - (frequencyDays + gracePeriod);
-    return (loan.principal * (rate / 100)) * Math.ceil(overdueDays / frequencyDays);
+  // Find last payment timestamp or start date
+  let lastTimestamp = getPhilippineMidnightDate(loan.startDate).getTime();
+  let lastPaymentDateStr: string | null = null;
+  if (activePayments.length > 0) {
+    const sorted = [...activePayments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    lastTimestamp = getPhilippineMidnightDate(sorted[0].date).getTime();
+    lastPaymentDateStr = sorted[0].date;
   }
 
-  return 0;
+  const currentMid = getPhilippineMidnightDate(currentDate);
+  const lastActivityDate = new Date(lastTimestamp);
+  
+  // Expected next installment due date
+  const expectedDueDateObj = addDays(lastActivityDate, frequencyDays);
+  const expectedDueDate = expectedDueDateObj.toISOString();
+
+  // Days since last payment or loan start
+  const daysSinceLastActivity = differenceInDays(currentMid, lastActivityDate);
+  const daysOverdue = Math.max(0, daysSinceLastActivity - (frequencyDays + gracePeriod));
+  const isOverdue = daysOverdue > 0 && remaining > 0;
+
+  let missedPeriods = 0;
+  let accruedPenaltyAmount = 0;
+
+  if (isOverdue && rate > 0) {
+    missedPeriods = Math.max(1, Math.ceil(daysOverdue / frequencyDays));
+    // Calculate 2% penalty on the scheduled installment amount
+    const baseInstallment = loan.installmentAmount > 0 ? loan.installmentAmount : (loan.principal / (loan.installments || 1));
+    accruedPenaltyAmount = Math.round((baseInstallment * (rate / 100) * missedPeriods) * 100) / 100;
+  }
+
+  const pendingPenaltyAmount = Math.max(0, accruedPenaltyAmount - penaltiesPaid);
+
+  return {
+    isOverdue,
+    daysOverdue,
+    missedPeriods,
+    penaltyRate: rate,
+    gracePeriod,
+    accruedPenaltyAmount,
+    penaltiesPaid,
+    pendingPenaltyAmount,
+    lastPaymentDate: lastPaymentDateStr,
+    expectedDueDate,
+  };
+}
+
+export function calculateLatePenalty(loan: Loan, payments: Payment[], currentDate: Date = getPhilippineNow()): number {
+  const details = getLoanOverdueDetails(loan, payments, currentDate);
+  return details.pendingPenaltyAmount;
 }

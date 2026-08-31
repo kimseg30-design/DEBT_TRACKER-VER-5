@@ -47,6 +47,7 @@ export interface Payment {
   id: string;
   loanId: string;
   amount: number;
+  penaltyPaid?: number; // Penalty amount paid in this transaction
   date: string;
   photoUrl?: string;
   notes?: string;

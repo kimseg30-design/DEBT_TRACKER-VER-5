@@ -12,17 +12,24 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { Camera, Upload, X, CheckCircle, Trash2, ShieldCheck, History, ArrowRight } from 'lucide-react';
-import { getLoanStatus, calculateCurrentDeclaredDetails, getRemainingBalance, getActiveLoanPayments } from '../lib/calculations';
+import { Camera, Upload, X, CheckCircle, Trash2, ShieldCheck, History, ArrowRight, AlertTriangle } from 'lucide-react';
+import { 
+  getLoanStatus, 
+  calculateCurrentDeclaredDetails, 
+  getRemainingBalance, 
+  getActiveLoanPayments,
+  getLoanOverdueDetails 
+} from '../lib/calculations';
 import { getPhilippineYMD, getPhilippineMidnightDate, formatPHTDate } from '../lib/phtDate';
 import { ConfirmDialog } from './ConfirmDialog';
 
 interface PaymentModalProps {
   loanId: string;
   onClose: () => void;
+  initialApplyPenalty?: boolean;
 }
 
-export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
+export default function PaymentModal({ loanId, onClose, initialApplyPenalty }: PaymentModalProps) {
   const { loans, payments, addPayment, updateLoan, deletePayment, declareNewBalance } = useStorage();
   const loan = loans.find(l => l.id === loanId);
   const loanPayments = payments.filter(p => p.loanId === loanId);
@@ -35,13 +42,22 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
   const [isEarlySettlementSelected, setIsEarlySettlementSelected] = useState(loan?.isEarlySettlement || false);
   const [shouldDeclareRemainingBalance, setShouldDeclareRemainingBalance] = useState(false);
   const [showDeclarationHistory, setShowDeclarationHistory] = useState(false);
+
+  // Overdue & Late Penalty State
+  const selectedDate = getPhilippineMidnightDate(date);
+  const overdueDetails = loan ? getLoanOverdueDetails(loan, payments, selectedDate) : null;
+  
+  const defaultPenaltyAmount = overdueDetails?.pendingPenaltyAmount && overdueDetails.pendingPenaltyAmount > 0
+    ? overdueDetails.pendingPenaltyAmount
+    : (loan ? Math.round(((loan.installmentAmount || loan.principal * 0.1) * ((loan.latePenalty?.rate || 2) / 100)) * 100) / 100 : 0);
+
+  const [applyLatePenalty, setApplyLatePenalty] = useState(initialApplyPenalty ?? (overdueDetails?.isOverdue || false));
+  const [penaltyAmount, setPenaltyAmount] = useState<string>(defaultPenaltyAmount.toString());
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!loan) return null;
 
-  // Dynamic calculations as of the selected payment date
-  const selectedDate = getPhilippineMidnightDate(date);
-  
   const { elapsedMonths, declaredInterest, declaredTotalAmount } = calculateCurrentDeclaredDetails(
     loan, 
     payments, 
@@ -57,6 +73,8 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
   );
 
   const parsedAmount = parseFloat(amount) || 0;
+  const parsedPenalty = applyLatePenalty ? (parseFloat(penaltyAmount) || 0) : 0;
+  const totalAmountToCollect = parsedAmount + parsedPenalty;
   const simulatedRemainingAfterPayment = Math.max(0, currentBalance - parsedAmount);
 
   const handleAutoFillRemainingBalance = () => {
@@ -85,8 +103,11 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
       const paymentData = {
         loanId,
         amount: parsedAmount,
+        penaltyPaid: applyLatePenalty && parsedPenalty > 0 ? parsedPenalty : undefined,
         date: new Date(date).toISOString(),
-        notes,
+        notes: applyLatePenalty && parsedPenalty > 0
+          ? (notes ? `${notes} (Included ₱${parsedPenalty.toLocaleString()} late penalty fee)` : `Included ₱${parsedPenalty.toLocaleString()} late penalty fee`)
+          : notes,
         ...(photo ? { photoUrl: photo } : {}),
         isVerified: true,
       };
@@ -111,7 +132,11 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
         );
         toast.success(`Payment recorded & New Principal ₱${simulatedRemainingAfterPayment.toLocaleString()} declared!`);
       } else {
-        toast.success('Payment recorded successfully');
+        if (applyLatePenalty && parsedPenalty > 0) {
+          toast.success(`Payment recorded with ₱${parsedPenalty.toLocaleString()} late penalty fee!`);
+        } else {
+          toast.success('Payment recorded successfully');
+        }
       }
 
       onClose();
@@ -148,7 +173,7 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
             <h3 className="text-sm font-medium text-zinc-300 uppercase tracking-wider">Record New Payment</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="amount" className="text-zinc-300">Amount (₱)</Label>
+                <Label htmlFor="amount" className="text-zinc-300">Loan Repayment Amount (₱)</Label>
                 <Input 
                   id="amount" 
                   type="number" 
@@ -169,6 +194,75 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
                   className="bg-background border-primary/10 text-white focus:border-primary/50"
                 />
               </div>
+
+              {/* Late Penalty Application Card */}
+              <div className={`p-3 rounded-xl border transition-all ${
+                overdueDetails?.isOverdue 
+                  ? 'bg-rose-950/20 border-rose-500/30' 
+                  : 'bg-background/40 border-primary/10'
+              }`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start space-x-2">
+                    <input 
+                      id="applyPenalty" 
+                      type="checkbox" 
+                      checked={applyLatePenalty}
+                      onChange={(e) => {
+                        setApplyLatePenalty(e.target.checked);
+                        if (e.target.checked && (!penaltyAmount || parseFloat(penaltyAmount) <= 0)) {
+                          setPenaltyAmount(defaultPenaltyAmount.toString());
+                        }
+                      }}
+                      className="rounded border-rose-500/40 bg-background text-rose-500 focus:ring-rose-500 h-4 w-4 mt-0.5 cursor-pointer"
+                    />
+                    <div>
+                      <Label htmlFor="applyPenalty" className="font-bold text-xs cursor-pointer block text-white">
+                        Apply {loan.latePenalty?.rate || 2}% Late Penalty
+                      </Label>
+                      {overdueDetails?.isOverdue && (
+                        <p className="text-[11px] text-rose-300 mt-0.5 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3 inline text-rose-400" />
+                          Account is {overdueDetails.daysOverdue} {overdueDetails.daysOverdue === 1 ? 'day' : 'days'} overdue
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {applyLatePenalty && (
+                  <div className="mt-3 pt-2.5 border-t border-rose-500/20 grid grid-cols-2 gap-2 items-center animate-in fade-in">
+                    <Label htmlFor="penaltyInput" className="text-[11px] text-zinc-300">
+                      Penalty Fee (₱):
+                    </Label>
+                    <Input
+                      id="penaltyInput"
+                      type="number"
+                      value={penaltyAmount}
+                      onChange={(e) => setPenaltyAmount(e.target.value)}
+                      className="h-8 text-xs bg-background border-rose-500/30 text-rose-300 focus:border-rose-400"
+                      placeholder="0.00"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Total Payment Summary Box */}
+              {applyLatePenalty && parsedPenalty > 0 && (
+                <div className="p-3 bg-zinc-950/80 border border-primary/20 rounded-xl space-y-1.5 text-xs">
+                  <div className="flex justify-between text-zinc-300">
+                    <span>Installment / Principal:</span>
+                    <span className="font-mono text-white">₱{parsedAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-rose-400">
+                    <span>Late Penalty Fee ({loan.latePenalty?.rate || 2}%):</span>
+                    <span className="font-mono font-bold">+₱{parsedPenalty.toLocaleString()}</span>
+                  </div>
+                  <div className="border-t border-zinc-800 pt-1.5 flex justify-between font-bold text-sm">
+                    <span className="text-primary">Total Cash to Collect:</span>
+                    <span className="text-primary font-mono text-base">₱{totalAmountToCollect.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Early Settlement Option */}
               <div className="flex items-center space-x-2 py-1 bg-background/40 border border-primary/10 rounded-lg p-3">
@@ -343,8 +437,13 @@ export default function PaymentModal({ loanId, onClose }: PaymentModalProps) {
                   <div key={p.id} className="p-4 bg-background/50 border border-primary/10 rounded-xl space-y-2">
                     <div className="flex justify-between items-start">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <p className="text-lg font-bold text-white">₱{p.amount.toLocaleString()}</p>
+                          {p.penaltyPaid && p.penaltyPaid > 0 && (
+                            <span className="text-[10px] px-2 py-0.5 bg-rose-500/20 text-rose-300 rounded-full font-bold border border-rose-500/30">
+                              +₱{p.penaltyPaid.toLocaleString()} Penalty Paid
+                            </span>
+                          )}
                           {p.isPreviousCycle && (
                             <span className="text-[9px] px-1.5 py-0.5 bg-zinc-800 text-zinc-400 rounded font-semibold border border-zinc-700">
                               Previous Cycle

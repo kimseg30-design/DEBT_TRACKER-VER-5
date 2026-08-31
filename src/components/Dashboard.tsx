@@ -1,7 +1,12 @@
+import React, { useState } from 'react';
 import { useStorage } from '../lib/storage';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { cn } from '../lib/utils';
-import { calculateCurrentDeclaredDetails, getRemainingBalance } from '../lib/calculations';
+import { 
+  calculateCurrentDeclaredDetails, 
+  getRemainingBalance, 
+  getLoanOverdueDetails 
+} from '../lib/calculations';
 import { formatPHTDate } from '../lib/phtDate';
 import { 
   TrendingUp, 
@@ -20,9 +25,14 @@ import {
   ArrowRight,
   Sparkles,
   WalletCards,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle,
+  Receipt,
+  CheckCircle
 } from 'lucide-react';
 import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import PaymentModal from './PaymentModal';
 import { 
   BarChart, 
   Bar, 
@@ -36,6 +46,7 @@ import {
 
 export default function Dashboard() {
   const { loans, payments, members, contributions } = useStorage();
+  const [selectedLoanForPayment, setSelectedLoanForPayment] = useState<{ id: string; applyPenalty?: boolean } | null>(null);
 
   // 1. Total Disbursed (Principal disbursed across all loans)
   const totalDisbursed = loans.reduce((sum, l) => sum + (l.originalPrincipal || l.principal), 0);
@@ -110,15 +121,30 @@ export default function Dashboard() {
 
   // 4. Total Collections Received
   const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalPenaltiesCollected = payments.reduce((sum, p) => sum + (p.penaltyPaid || 0), 0);
 
-  // 5. Total Remaining Balance
+  // 5. Overdue Loans & Penalties Analysis
+  const overdueLoansList = activeLoans.map(l => {
+    const overdueDetails = getLoanOverdueDetails(l, payments);
+    const remaining = getRemainingBalance(l, payments);
+    return {
+      loan: l,
+      details: overdueDetails,
+      remaining,
+    };
+  }).filter(item => item.details.isOverdue && item.remaining > 0);
+
+  const totalUnpaidPenalties = overdueLoansList.reduce((sum, item) => sum + item.details.pendingPenaltyAmount, 0);
+  const totalOverdueBalance = overdueLoansList.reduce((sum, item) => sum + item.remaining, 0);
+
+  // 6. Total Remaining Balance
   const totalRemainingBalance = Math.max(0, loans.reduce((sum, l) => sum + getRemainingBalance(l, payments), 0));
 
-  // 6. Total Members Contributions
+  // 7. Total Members Contributions
   const activeMembers = members.filter(m => m.status === 'Active').length;
   const totalContributions = contributions.reduce((sum, c) => sum + c.amount, 0);
 
-  // 7. Total Interest to all Accounts
+  // 8. Total Interest to all Accounts
   const totalAccruedInterestAll = totalInterestFullyPaid + totalActiveAccruedInterest;
   const totalContractualInterestAll = totalInterestFullyPaid + totalActiveContractualInterest;
 
@@ -126,7 +152,7 @@ export default function Dashboard() {
   const totalExpected = totalDisbursed + totalAccruedInterestAll;
   const collectionPercentage = totalExpected > 0 ? Math.min(100, Math.round((totalCollected / totalExpected) * 100)) : 0;
 
-  // The 7 Requested Dashboard Metrics
+  // Primary Dashboard Metrics
   const stats = [
     { 
       name: '1. Total Disbursed', 
@@ -198,12 +224,23 @@ export default function Dashboard() {
       bg: 'bg-secondary/10', 
       shadow: 'shadow-[0_0_15px_rgba(var(--secondary),0.2)]' 
     },
+    { 
+      name: '8. Late Penalties Collected & Dues', 
+      value: `₱${totalPenaltiesCollected.toLocaleString()}`, 
+      formula: `Penalty Collected: ₱${totalPenaltiesCollected.toLocaleString()} • Pending: ₱${totalUnpaidPenalties.toLocaleString()}`,
+      subtext: `${overdueLoansList.length} ${overdueLoansList.length === 1 ? 'account' : 'accounts'} currently overdue`,
+      icon: AlertTriangle, 
+      color: 'text-rose-400', 
+      bg: 'bg-rose-500/10', 
+      shadow: 'shadow-[0_0_15px_rgba(244,63,94,0.2)]' 
+    },
   ];
 
   const chartData = [
     { name: 'Collections Received', value: totalCollected, color: 'oklch(0.85 0.35 140)' },
     { name: 'Remaining Balance', value: totalRemainingBalance, color: 'oklch(0.6 0.2 20)' },
     { name: 'Member Contributions', value: totalContributions, color: 'oklch(0.7 0.25 290)' },
+    { name: 'Penalties Collected', value: totalPenaltiesCollected, color: 'oklch(0.65 0.24 15)' },
   ];
 
   const recentPayments = [...payments]
@@ -216,19 +253,18 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white neon-text">Dashboard</h2>
-          <p className="text-zinc-300">Comprehensive overview of disbursements, earned and remaining interest, collections, and member funds.</p>
+          <p className="text-zinc-300">Comprehensive overview of disbursements, earned interest, late penalties, collections, and member funds.</p>
         </div>
       </div>
 
-      {/* Main Metric Cards Grid (7 Requested Primary Metrics) */}
+      {/* Main Metric Cards Grid */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {stats.map((stat, idx) => (
+        {stats.map((stat) => (
           <Card 
             key={stat.name} 
             className={cn(
               "bg-card border-primary/10 transition-all duration-300 hover:border-primary/30", 
-              stat.shadow,
-              idx === 6 ? "sm:col-span-2 lg:col-span-3 xl:col-span-2 bg-gradient-to-br from-card to-card/90 border-secondary/20" : ""
+              stat.shadow
             )}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -320,6 +356,147 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* DEDICATED PENALTY SECTION: Overdue Accounts & 2% Late Penalties Tracker */}
+      <Card className="bg-card border-rose-500/30 shadow-[0_0_30px_rgba(244,63,94,0.1)] overflow-hidden">
+        <CardHeader className="border-b border-zinc-800/80 pb-4 bg-rose-950/20">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-rose-500/15 rounded-xl border border-rose-500/30 text-rose-400">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                  <span>Overdue Accounts & 2% Late Penalties Tracker</span>
+                  {overdueLoansList.length > 0 ? (
+                    <Badge variant="destructive" className="bg-rose-500/20 text-rose-300 border-rose-500/40 text-xs py-0.5">
+                      {overdueLoansList.length} Overdue {overdueLoansList.length === 1 ? 'Account' : 'Accounts'}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-emerald-500/15 border-emerald-500/30 text-emerald-400 text-xs py-0.5">
+                      All Accounts Up to Date
+                    </Badge>
+                  )}
+                </CardTitle>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Tracks borrowers who failed to pay within the scheduled period and calculates applicable 2% late penalties.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Penalties Summary Strip */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="px-3 py-1.5 bg-background/70 border border-zinc-800 rounded-lg">
+                <span className="text-zinc-400 text-[10px] block">Overdue Principal/Balance</span>
+                <span className="font-bold text-white font-mono">₱{totalOverdueBalance.toLocaleString()}</span>
+              </div>
+              <div className="px-3 py-1.5 bg-rose-950/30 border border-rose-500/30 rounded-lg">
+                <span className="text-rose-300 text-[10px] block">Pending 2% Late Penalties</span>
+                <span className="font-bold text-rose-400 font-mono">₱{totalUnpaidPenalties.toLocaleString()}</span>
+              </div>
+              <div className="px-3 py-1.5 bg-emerald-950/30 border border-emerald-500/30 rounded-lg">
+                <span className="text-emerald-400 text-[10px] block">Penalties Collected</span>
+                <span className="font-bold text-emerald-400 font-mono">₱{totalPenaltiesCollected.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-0">
+          {overdueLoansList.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-zinc-800/80 bg-background/40 text-zinc-400 font-semibold uppercase text-[10px] tracking-wider">
+                    <th className="py-3 px-4">Borrower Name</th>
+                    <th className="py-3 px-4">Frequency & Installment</th>
+                    <th className="py-3 px-4">Expected Due Date</th>
+                    <th className="py-3 px-4 text-rose-400">Overdue Status</th>
+                    <th className="py-3 px-4 text-rose-300">2% Late Penalty Due</th>
+                    <th className="py-3 px-4 text-white">Remaining Balance</th>
+                    <th className="py-3 px-4 text-right">Quick Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/60">
+                  {overdueLoansList.map(({ loan, details, remaining }) => (
+                    <tr 
+                      key={loan.id}
+                      className="hover:bg-rose-500/5 transition-colors text-zinc-300"
+                    >
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-white text-sm">{loan.borrowerName}</div>
+                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400 mt-0.5">
+                          <span>Group: {loan.loanGroup || '1st'}</span>
+                          <span>•</span>
+                          <span>{loan.loanType}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="text-white font-medium">₱{(loan.installmentAmount || 0).toLocaleString()}</div>
+                        <span className="text-[10px] text-zinc-400">{loan.frequency} schedule</span>
+                      </td>
+                      <td className="py-3 px-4 text-zinc-300">
+                        <div className="flex items-center gap-1.5">
+                          <CalendarCheck className="h-3.5 w-3.5 text-zinc-400" />
+                          <span>{formatPHTDate(details.expectedDueDate)}</span>
+                        </div>
+                        {details.lastPaymentDate ? (
+                          <span className="text-[10px] text-zinc-500 block mt-0.5">
+                            Last paid: {formatPHTDate(details.lastPaymentDate)}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-amber-500/80 block mt-0.5">
+                            No payments recorded yet
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant="destructive" className="bg-rose-500/20 text-rose-300 border-rose-500/40 text-[10px] font-bold py-0.5">
+                          {details.daysOverdue} {details.daysOverdue === 1 ? 'day' : 'days'} late
+                        </Badge>
+                        <span className="text-[10px] text-zinc-400 block mt-0.5">
+                          Past {details.gracePeriod}-day grace period
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-rose-400 text-sm">
+                          ₱{details.pendingPenaltyAmount.toLocaleString()}
+                        </div>
+                        <span className="text-[10px] text-zinc-400 block">
+                          Rate: {details.penaltyRate}% ({details.missedPeriods} {details.missedPeriods === 1 ? 'cycle' : 'cycles'})
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-bold text-white text-sm">
+                        ₱{remaining.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <Button
+                          size="sm"
+                          onClick={() => setSelectedLoanForPayment({ id: loan.id, applyPenalty: true })}
+                          className="h-8 text-xs bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.3)] font-semibold"
+                        >
+                          <Receipt className="h-3.5 w-3.5 mr-1.5" />
+                          Record & Apply Penalty
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10 text-center px-4 text-zinc-400 space-y-2">
+              <div className="p-3 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-emerald-400 mb-1">
+                <CheckCircle className="h-8 w-8" />
+              </div>
+              <p className="font-semibold text-sm text-emerald-400">All Borrower Accounts Are Up to Date</p>
+              <p className="text-xs text-zinc-400 max-w-md">
+                There are no overdue accounts exceeding their grace period. When an installment becomes late, it will automatically calculate a 2% late penalty and appear here.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Summary Breakdown of Fully Paid Borrowers */}
       <Card className="bg-card border-emerald-500/20 shadow-[0_0_25px_rgba(16,185,129,0.08)] overflow-hidden">
@@ -477,8 +654,15 @@ export default function Dashboard() {
                           {formatPHTDate(payment.date)}
                         </p>
                       </div>
-                      <div className="text-sm font-bold text-white">
-                        ₱{payment.amount.toLocaleString()}
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-white">
+                          ₱{payment.amount.toLocaleString()}
+                        </div>
+                        {payment.penaltyPaid && payment.penaltyPaid > 0 && (
+                          <div className="text-[10px] font-semibold text-rose-400">
+                            +₱{payment.penaltyPaid.toLocaleString()} Penalty
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -493,6 +677,15 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Quick Payment Modal Triggered from Penalty / Action Table */}
+      {selectedLoanForPayment && (
+        <PaymentModal
+          loanId={selectedLoanForPayment.id}
+          initialApplyPenalty={selectedLoanForPayment.applyPenalty}
+          onClose={() => setSelectedLoanForPayment(null)}
+        />
+      )}
     </div>
   );
 }
