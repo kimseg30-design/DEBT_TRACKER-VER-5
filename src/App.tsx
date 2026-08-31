@@ -122,7 +122,11 @@ function Sidebar({ isOpen, setIsOpen, onOpenInstall }: SidebarProps) {
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-3 px-2">
                 <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold overflow-hidden shadow-[0_0_10px_rgba(var(--primary),0.3)]">
-                  {user?.photoURL ? <img src={user.photoURL} alt={user.displayName} referrerPolicy="no-referrer" /> : user?.displayName?.[0]?.toUpperCase()}
+                  {user?.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || 'User'} referrerPolicy="no-referrer" />
+                  ) : (
+                    (user?.displayName?.[0] || user?.email?.[0] || 'U').toUpperCase()
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{user?.displayName}</p>

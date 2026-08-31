@@ -55,7 +55,7 @@ export default function LoanList() {
   const [expandedBorrowers, setExpandedBorrowers] = useState<Record<string, boolean>>({});
 
   const filteredLoans = loans.filter(loan => {
-    const matchesSearch = loan.borrowerName.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = (loan.borrowerName || '').toLowerCase().includes((search || '').toLowerCase());
     const matchesStatus = statusFilter === 'all' || loan.status === statusFilter;
     const matchesFrequency = frequencyFilter === 'all' || loan.frequency === frequencyFilter;
     return matchesSearch && matchesStatus && matchesFrequency;
@@ -106,7 +106,7 @@ export default function LoanList() {
   const groupedBorrowers = useMemo(() => {
     const groups: Record<string, typeof loans> = {};
     filteredLoans.forEach(loan => {
-      const key = loan.borrowerName.trim().toLowerCase();
+      const key = (loan.borrowerName || 'unknown').trim().toLowerCase();
       if (!groups[key]) {
         groups[key] = [];
       }

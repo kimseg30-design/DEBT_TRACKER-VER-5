@@ -51,6 +51,14 @@ export default function LoanDocumentsModal({
 
   if (!loan) return null;
 
+  const appName = appSettings?.appName || 'DebtFlow';
+  const businessName = appSettings?.businessName || 'DebtFlow Credit & Financial Services';
+  const tagline = appSettings?.tagline || 'Lending & Installment Management System';
+  const repName = appSettings?.representativeName || 'Authorized Lending Representative';
+  const repTitle = appSettings?.representativeTitle || 'DebtFlow Loan Officer / Creditor';
+  const contactNumber = appSettings?.contactNumber || '';
+  const address = appSettings?.address || '';
+
   const {
     borrowerName,
     principal,
@@ -78,7 +86,7 @@ export default function LoanDocumentsModal({
 
   const principalWords = numberToWords(principal);
   const totalAmountWords = numberToWords(calc.totalAmount);
-  const formattedRefId = `LN-${id.slice(0, 8).toUpperCase()}`;
+  const formattedRefId = `LN-${(id || '').slice(0, 8).toUpperCase()}`;
 
   // Generate self-contained standalone HTML for pristine direct printing / export
   const generatePrintHTML = () => {
@@ -89,7 +97,7 @@ export default function LoanDocumentsModal({
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>${appSettings.appName.replace(/\s+/g, '_')}_Loan_Documents_${formattedRefId}_${borrowerName.replace(/\s+/g, '_')}</title>
+  <title>${appName.replace(/\s+/g, '_')}_Loan_Documents_${formattedRefId}_${(borrowerName || 'Borrower').replace(/\s+/g, '_')}</title>
   <style>
     @page {
       size: portrait;
@@ -261,7 +269,7 @@ export default function LoanDocumentsModal({
 
   const handleCopySummary = () => {
     const summaryText = `
-${appSettings.businessName.toUpperCase()} - LOAN SUMMARY
+${businessName.toUpperCase()} - LOAN SUMMARY
 Ref ID: ${formattedRefId}
 Borrower: ${borrowerName}
 Principal: ₱${principal.toLocaleString()} (${principalWords})
@@ -274,7 +282,7 @@ Date Granted: ${formatPHTDate(startDate)}
 First Payment Due: ${formatPHTDate(firstPaymentDate)}
 Maturity Date: ${formatPHTDate(maturityDate)}
 Late Penalty: ${latePenalty.rate}% after ${latePenalty.gracePeriod} days grace period.
-Officer: ${appSettings.officerTitle}
+Officer: ${repName ? `${repName} (${repTitle})` : repTitle}
     `.trim();
 
     navigator.clipboard.writeText(summaryText);
@@ -440,7 +448,7 @@ Officer: ${appSettings.officerTitle}
                   Loan Agreement & Contract
                 </h1>
                 <p className="text-[11px] font-semibold text-zinc-600 uppercase tracking-wider">
-                  {appSettings.businessName} • {appSettings.tagline}
+                  {businessName} • {tagline}
                 </p>
                 <div className="flex justify-between items-center text-[10px] text-zinc-600 pt-2 font-mono">
                   <span>LOAN REF: <strong>{formattedRefId}</strong></span>
@@ -458,10 +466,13 @@ Officer: ${appSettings.officerTitle}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-50 p-4 rounded-lg border border-zinc-300 text-xs">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-zinc-500 block">LENDER / CREDITOR:</span>
-                    <strong className="text-zinc-900 text-sm">{appSettings.businessName}</strong>
-                    <p className="text-zinc-600 text-[11px]">{appSettings.officerTitle}</p>
-                    {appSettings.contactInfo && (
-                      <p className="text-zinc-500 text-[10px]">{appSettings.contactInfo}</p>
+                    <strong className="text-zinc-900 text-sm">{businessName}</strong>
+                    <p className="text-zinc-600 text-[11px]">{repName ? `${repName} (${repTitle})` : repTitle}</p>
+                    {contactNumber && (
+                      <p className="text-zinc-500 text-[10px]">Contact: {contactNumber}</p>
+                    )}
+                    {address && (
+                      <p className="text-zinc-500 text-[10px]">Address: {address}</p>
                     )}
                   </div>
                   <div>
@@ -633,8 +644,8 @@ Officer: ${appSettings.officerTitle}
 
                   <div className="text-center space-y-1">
                     <div className="border-b-2 border-zinc-900 h-12 w-48 sm:w-64 mx-auto"></div>
-                    <p className="font-bold text-zinc-950 uppercase text-xs">{appSettings.officerTitle.toUpperCase()}</p>
-                    <p className="text-[10px] text-zinc-600">{appSettings.businessName} / Creditor</p>
+                    <p className="font-bold text-zinc-950 uppercase text-xs">{repName ? repName.toUpperCase() : repTitle.toUpperCase()}</p>
+                    <p className="text-[10px] text-zinc-600">{repTitle} • {businessName}</p>
                     <p className="text-[10px] text-zinc-500">Date: ________________________</p>
                   </div>
                 </div>
@@ -658,7 +669,7 @@ Officer: ${appSettings.officerTitle}
                   Disclosure Statement on Loan/Credit Transaction
                 </h1>
                 <p className="text-[11px] font-semibold text-zinc-600 uppercase tracking-wider">
-                  {appSettings.businessName} • (In Compliance with RA 3765 - Truth in Lending Act)
+                  {businessName} • (In Compliance with RA 3765 - Truth in Lending Act)
                 </p>
                 <div className="flex justify-between items-center text-[10px] text-zinc-600 pt-2 font-mono">
                   <span>STATEMENT NO: <strong>DS-{formattedRefId}</strong></span>
@@ -785,8 +796,8 @@ Officer: ${appSettings.officerTitle}
 
                   <div className="text-center space-y-1">
                     <div className="border-b-2 border-zinc-900 h-12 w-48 sm:w-64 mx-auto"></div>
-                    <p className="font-bold text-zinc-950 uppercase text-xs">{appSettings.officerTitle.toUpperCase()}</p>
-                    <p className="text-[10px] text-zinc-600">{appSettings.businessName}</p>
+                    <p className="font-bold text-zinc-950 uppercase text-xs">{repName ? repName.toUpperCase() : repTitle.toUpperCase()}</p>
+                    <p className="text-[10px] text-zinc-600">{repTitle} • {businessName}</p>
                     <p className="text-[10px] text-zinc-500">Date: ________________________</p>
                   </div>
                 </div>
@@ -805,7 +816,7 @@ Officer: ${appSettings.officerTitle}
                   Promissory Note
                 </h1>
                 <p className="text-[11px] font-semibold text-zinc-600 uppercase tracking-wider">
-                  {appSettings.businessName} • (Katibayan ng Pagkakautang at Pangakong Pagbabayad)
+                  {businessName} • (Katibayan ng Pagkakautang at Pangakong Pagbabayad)
                 </p>
                 <div className="flex justify-between items-center text-[10px] text-zinc-600 pt-2 font-mono">
                   <span>NOTE NO: <strong>PN-{formattedRefId}</strong></span>
@@ -819,7 +830,7 @@ Officer: ${appSettings.officerTitle}
                 <p>
                   <strong>FOR VALUE RECEIVED</strong>, the undersigned (the <strong>"Maker / Borrower"</strong>),{' '}
                   <strong className="text-zinc-950 uppercase">{borrowerName}</strong>, hereby unconditionally promises to pay to the order of{' '}
-                  <strong className="text-zinc-950">{appSettings.businessName} / Assigns</strong> (the <strong>"Holder"</strong>), the total sum of{' '}
+                  <strong className="text-zinc-950">{businessName} / Assigns</strong> (the <strong>"Holder"</strong>), the total sum of{' '}
                   <strong className="text-zinc-950 underline">{totalAmountWords}</strong> (<strong>₱{calc.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>), representing the principal loan amount of{' '}
                   <strong>₱{principal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> plus monthly nominal interest at the rate of{' '}
                   <strong>{interestRate}%</strong> per month.
@@ -866,7 +877,7 @@ Officer: ${appSettings.officerTitle}
 
                 <div className="pt-4 text-center">
                   <div className="border-b border-zinc-400 h-10 w-48 sm:w-64 mx-auto"></div>
-                  <p className="text-[10px] text-zinc-600 mt-1">{appSettings.officerTitle} / Authorized Witness</p>
+                  <p className="text-[10px] text-zinc-600 mt-1">{repName ? `${repName} (${repTitle})` : repTitle} / Authorized Witness</p>
                 </div>
               </div>
             </div>
