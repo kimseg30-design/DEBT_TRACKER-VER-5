@@ -166,14 +166,23 @@ export default function PaymentModal({ loanId, onClose, initialApplyPenalty }: P
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="bg-card border-primary/10 text-white max-w-2xl max-h-[90vh] overflow-auto shadow-[0_0_30px_rgba(var(--primary),0.1)]">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold neon-text">Payments for {loan.borrowerName}</DialogTitle>
+      <DialogContent className="bg-card border-primary/20 text-white w-[calc(100vw-1.25rem)] max-w-3xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2.5rem)] overflow-y-auto p-4 sm:p-6 shadow-[0_0_40px_rgba(var(--primary),0.15)]">
+        <DialogHeader className="pb-2 border-b border-zinc-800">
+          <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
+            <DialogTitle className="text-xl sm:text-2xl font-bold neon-text truncate">
+              Payments: {loan.borrowerName}
+            </DialogTitle>
+            <span className="text-[11px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+              ID: {loan.id.slice(0, 8)}
+            </span>
+          </div>
         </DialogHeader>
 
-        <div className="grid md:grid-cols-2 gap-8 py-4">
-          <div className="space-y-6">
-            <h3 className="text-sm font-medium text-zinc-300 uppercase tracking-wider">Record New Payment</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+          <div className="space-y-4">
+            <h3 className="text-xs sm:text-sm font-semibold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Record New Payment</span>
+            </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="amount" className="text-zinc-300">Loan Repayment Amount (₱)</Label>
