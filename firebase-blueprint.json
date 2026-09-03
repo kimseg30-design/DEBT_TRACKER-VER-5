@@ -40,14 +40,63 @@
         "id": { "type": "string" },
         "loanId": { "type": "string" },
         "amount": { "type": "number" },
+        "penaltyPaid": { "type": "number" },
         "date": { "type": "string", "format": "date-time" },
         "photoUrl": { "type": "string" },
+        "notes": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "isPreviousCycle": { "type": "boolean" },
+        "declarationId": { "type": "string" },
+        "uid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "loanId", "amount", "date", "uid"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "Represents a group member",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "joinDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Inactive"] },
+        "contact": { "type": "string" },
+        "baseContribution": { "type": "number" },
+        "uid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "joinDate", "status", "uid"]
+    },
+    "Contribution": {
+      "title": "Contribution",
+      "description": "Represents a member contribution record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "memberId": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
         "notes": { "type": "string" },
         "isVerified": { "type": "boolean" },
         "uid": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "loanId", "amount", "date", "uid"]
+      "required": ["id", "memberId", "amount", "date", "uid"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Represents an audit trail log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "user": { "type": "string" },
+        "uid": { "type": "string" }
+      },
+      "required": ["id", "action", "details", "timestamp", "uid"]
     },
     "AppSettings": {
       "title": "AppSettings",
@@ -73,6 +122,18 @@
     "/payments/{paymentId}": {
       "schema": "Payment",
       "description": "Collection of payments"
+    },
+    "/members/{memberId}": {
+      "schema": "Member",
+      "description": "Collection of group members"
+    },
+    "/contributions/{contributionId}": {
+      "schema": "Contribution",
+      "description": "Collection of group contributions"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Collection of audit trail logs"
     },
     "/settings/{settingId}": {
       "schema": "AppSettings",

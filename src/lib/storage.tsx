@@ -5,6 +5,31 @@ import { auth, db, collection, doc, setDoc, getDocs, query, where, onSnapshot, d
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { toast } from 'sonner';
 
+/**
+ * Recursively removes any object keys whose value is undefined,
+ * preventing Firestore from throwing: "Unsupported field value: undefined".
+ */
+export function cleanFirestoreData<T extends Record<string, any>>(data: T): T {
+  if (data === null || data === undefined) return data;
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => (typeof item === 'object' && item !== null && !(item instanceof Date) ? cleanFirestoreData(item) : item)) as unknown as T;
+  }
+  const cleaned: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) {
+      continue;
+    }
+    if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
+      cleaned[key] = cleanFirestoreData(value);
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned as T;
+}
+
 interface StorageContextType {
   loans: Loan[];
   payments: Payment[];
@@ -181,7 +206,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setAuditLogs(updated);
       localStorage.setItem('auditLogs', JSON.stringify(updated));
     } else if (user) {
-      await setDoc(doc(db, 'auditLogs', id), { ...newLog, uid: user.uid });
+      await setDoc(doc(db, 'auditLogs', id), cleanFirestoreData({ ...newLog, uid: user.uid }));
     }
   };
 
@@ -201,7 +226,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setLoans(updated);
       localStorage.setItem('loans', JSON.stringify(updated));
     } else if (user) {
-      await setDoc(doc(db, 'loans', id), { ...newLoan, uid: user.uid });
+      await setDoc(doc(db, 'loans', id), cleanFirestoreData({ ...newLoan, uid: user.uid }));
     }
     await logAction('ADD_LOAN', `Added loan for ${loanData.borrowerName} (₱${loanData.principal})`);
     return newLoan;
@@ -211,19 +236,14 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const now = new Date().toISOString();
     
     // Ensure no properties are undefined before updating Firestore
-    const safeLoanData: Record<string, any> = {};
-    Object.entries(loanData).forEach(([key, val]) => {
-      if (val !== undefined) {
-        safeLoanData[key] = val;
-      }
-    });
+    const safeLoanData: Record<string, any> = cleanFirestoreData(loanData);
 
     if (storageType === 'local') {
       const updated = loans.map(l => l.id === id ? { ...l, ...loanData, updatedAt: now } : l);
       setLoans(updated);
       localStorage.setItem('loans', JSON.stringify(updated));
     } else if (user) {
-      await updateDoc(doc(db, 'loans', id), { ...safeLoanData, updatedAt: now });
+      await updateDoc(doc(db, 'loans', id), cleanFirestoreData({ ...safeLoanData, updatedAt: now }));
     }
     await logAction('UPDATE_LOAN', `Updated loan ID: ${id}`);
   };
@@ -308,7 +328,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       localStorage.setItem('loans', JSON.stringify(updatedLoans));
       localStorage.setItem('payments', JSON.stringify(updatedPayments));
     } else if (user) {
-      await updateDoc(doc(db, 'loans', loanId), {
+      await updateDoc(doc(db, 'loans', loanId), cleanFirestoreData({
         originalPrincipal: updatedLoan.originalPrincipal,
         principal: updatedLoan.principal,
         startDate: updatedLoan.startDate,
@@ -319,13 +339,13 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isEarlySettlement: false,
         declarationHistory: updatedLoan.declarationHistory,
         updatedAt: now,
-      });
+      }));
 
       for (const p of currentActivePayments) {
-        await updateDoc(doc(db, 'payments', p.id), {
+        await updateDoc(doc(db, 'payments', p.id), cleanFirestoreData({
           isPreviousCycle: true,
           declarationId,
-        });
+        }));
       }
     }
 
@@ -349,7 +369,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setPayments(updated);
       localStorage.setItem('payments', JSON.stringify(updated));
     } else if (user) {
-      await setDoc(doc(db, 'payments', id), { ...newPayment, uid: user.uid });
+      await setDoc(doc(db, 'payments', id), cleanFirestoreData({ ...newPayment, uid: user.uid }));
     }
     await logAction('ADD_PAYMENT', `Recorded payment of ₱${paymentData.amount} for loan ID: ${paymentData.loanId}`);
   };
@@ -379,7 +399,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setMembers(updated);
       localStorage.setItem('members', JSON.stringify(updated));
     } else if (user) {
-      await setDoc(doc(db, 'members', id), { ...newMember, uid: user.uid });
+      await setDoc(doc(db, 'members', id), cleanFirestoreData({ ...newMember, uid: user.uid }));
     }
     await logAction('ADD_MEMBER', `Added member ${memberData.name}`);
   };
@@ -390,7 +410,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setMembers(updated);
       localStorage.setItem('members', JSON.stringify(updated));
     } else if (user) {
-      await updateDoc(doc(db, 'members', id), { ...memberData });
+      await updateDoc(doc(db, 'members', id), cleanFirestoreData(memberData));
     }
     await logAction('UPDATE_MEMBER', `Updated member ID: ${id}`);
   };
@@ -420,7 +440,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setContributions(updated);
       localStorage.setItem('contributions', JSON.stringify(updated));
     } else if (user) {
-      await setDoc(doc(db, 'contributions', id), { ...newContribution, uid: user.uid });
+      await setDoc(doc(db, 'contributions', id), cleanFirestoreData({ ...newContribution, uid: user.uid }));
     }
     await logAction('ADD_CONTRIBUTION', `Added contribution of ₱${contributionData.amount} for member ID: ${contributionData.memberId}`);
   };
@@ -431,7 +451,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setContributions(updated);
       localStorage.setItem('contributions', JSON.stringify(updated));
     } else if (user) {
-      await updateDoc(doc(db, 'contributions', id), { ...contributionData });
+      await updateDoc(doc(db, 'contributions', id), cleanFirestoreData(contributionData));
     }
     await logAction('UPDATE_CONTRIBUTION', `Updated contribution ID: ${id}`);
   };
@@ -542,7 +562,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (storageType === 'cloud' && user) {
       try {
-        await setDoc(doc(db, 'settings', user.uid), { ...updated, uid: user.uid }, { merge: true });
+        await setDoc(doc(db, 'settings', user.uid), cleanFirestoreData({ ...updated, uid: user.uid }), { merge: true });
       } catch (e) {
         console.error('Failed to sync app settings to cloud:', e);
       }
@@ -556,7 +576,7 @@ export const StorageProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (storageType === 'cloud' && user) {
       try {
-        await setDoc(doc(db, 'settings', user.uid), { ...DEFAULT_APP_SETTINGS, uid: user.uid });
+        await setDoc(doc(db, 'settings', user.uid), cleanFirestoreData({ ...DEFAULT_APP_SETTINGS, uid: user.uid }));
       } catch (e) {
         console.error('Failed to reset app settings in cloud:', e);
       }

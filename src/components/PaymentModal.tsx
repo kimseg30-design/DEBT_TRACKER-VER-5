@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { Payment } from '../types';
 import { useStorage } from '../lib/storage';
 import { 
   Dialog, 
@@ -103,16 +104,23 @@ export default function PaymentModal({ loanId, onClose, initialApplyPenalty }: P
     }
 
     try {
-      const paymentData = {
+      const trimmedNotes = notes ? notes.trim() : '';
+      const hasPenalty = applyLatePenalty && parsedPenalty > 0;
+      let finalNotes = trimmedNotes;
+      if (hasPenalty) {
+        finalNotes = trimmedNotes 
+          ? `${trimmedNotes} (Included ₱${parsedPenalty.toLocaleString()} late penalty fee)`
+          : `Included ₱${parsedPenalty.toLocaleString()} late penalty fee`;
+      }
+
+      const paymentData: Omit<Payment, 'id' | 'createdAt'> = {
         loanId,
         amount: parsedAmount,
-        penaltyPaid: applyLatePenalty && parsedPenalty > 0 ? parsedPenalty : undefined,
         date: new Date(date).toISOString(),
-        notes: applyLatePenalty && parsedPenalty > 0
-          ? (notes ? `${notes} (Included ₱${parsedPenalty.toLocaleString()} late penalty fee)` : `Included ₱${parsedPenalty.toLocaleString()} late penalty fee`)
-          : notes,
-        ...(photo ? { photoUrl: photo } : {}),
         isVerified: true,
+        ...(hasPenalty ? { penaltyPaid: parsedPenalty } : {}),
+        ...(finalNotes ? { notes: finalNotes } : {}),
+        ...(photo ? { photoUrl: photo } : {}),
       };
 
       await addPayment(paymentData);
