@@ -5,6 +5,7 @@
 
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { StorageProvider, useStorage } from './lib/storage';
+import { ThemeProvider, useTheme } from './lib/theme';
 import { Toaster } from './components/ui/sonner';
 import { 
   LayoutDashboard, 
@@ -20,7 +21,9 @@ import {
   PiggyBank,
   Activity,
   Download,
-  Smartphone
+  Smartphone,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from './components/ui/button';
@@ -44,6 +47,7 @@ interface SidebarProps {
 
 function Sidebar({ isOpen, setIsOpen, onOpenInstall }: SidebarProps) {
   const { user, login, handleLogout, storageType, appSettings } = useStorage();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
   const navItems = [
@@ -59,7 +63,7 @@ function Sidebar({ isOpen, setIsOpen, onOpenInstall }: SidebarProps) {
   return (
     <>
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-64 bg-background/95 backdrop-blur-xl border-r border-primary/20 transform transition-transform duration-200 ease-in-out lg:translate-x-0 overflow-y-auto",
+        "fixed inset-y-0 left-0 z-40 w-64 bg-card/95 backdrop-blur-xl border-r border-border transform transition-transform duration-200 ease-in-out lg:translate-x-0 overflow-y-auto",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col min-h-full p-6">
@@ -108,19 +112,34 @@ function Sidebar({ isOpen, setIsOpen, onOpenInstall }: SidebarProps) {
                 setIsOpen(false);
                 onOpenInstall();
               }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 border border-emerald-500/20 mt-3"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-300 border border-emerald-500/20 mt-3"
             >
-              <Download className="h-5 w-5 text-emerald-400" />
+              <Download className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
               <div className="flex flex-col text-left">
                 <span className="font-medium text-sm">Download App</span>
-                <span className="text-[10px] text-emerald-500/80">Install on any device</span>
+                <span className="text-[10px] text-emerald-600/80 dark:text-emerald-500/80">Install on any device</span>
               </div>
             </button>
           </nav>
 
-          <div className="mt-auto pt-6 border-t border-primary/10">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3 px-2">
+          <div className="mt-auto pt-6 border-t border-border">
+            <div className="flex flex-col gap-3">
+              {/* Sidebar Quick Theme Toggle */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-border bg-background/80 hover:bg-primary/10 transition-colors text-xs"
+              >
+                <div className="flex items-center gap-2 text-zinc-300">
+                  {theme === 'dark' ? <Moon className="h-4 w-4 text-primary" /> : <Sun className="h-4 w-4 text-amber-500" />}
+                  <span className="font-medium">{theme === 'dark' ? 'Dark Theme' : 'Light Theme'}</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-primary/15 text-primary border border-primary/30">
+                  Toggle
+                </span>
+              </button>
+
+              <div className="flex items-center gap-3 px-2 pt-1">
                 <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold overflow-hidden shadow-[0_0_10px_rgba(var(--primary),0.3)]">
                   {user?.photoURL ? (
                     <img src={user.photoURL} alt={user.displayName || 'User'} referrerPolicy="no-referrer" />
@@ -147,6 +166,7 @@ function Sidebar({ isOpen, setIsOpen, onOpenInstall }: SidebarProps) {
 
 function AppContent() {
   const { user, appSettings } = useStorage();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
@@ -158,13 +178,18 @@ function AppContent() {
   }, [appSettings?.appName]);
   
   if (!user) {
-    return <Auth />;
+    return (
+      <>
+        <Auth />
+        <Toaster position="top-right" theme={theme} richColors />
+      </>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-background text-foreground flex flex-col lg:flex-row transition-colors duration-200">
       {/* Mobile Sticky Header */}
-      <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-black/90 backdrop-blur-md border-b border-primary/10">
+      <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="p-1.5 bg-primary rounded-lg shadow-[0_0_10px_rgba(var(--primary),0.4)] shrink-0">
             <Wallet className="h-4 w-4 text-primary-foreground" />
@@ -173,24 +198,26 @@ function AppContent() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Quick Theme Toggle Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="h-8 w-8 text-zinc-400 hover:text-primary hover:bg-primary/10"
+            title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-primary" />}
+          </Button>
+
           {/* Quick Download App Header Button */}
           <Button
             variant="outline"
             size="sm"
             onClick={() => setIsInstallModalOpen(true)}
-            className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/15 text-xs h-8 gap-1.5 px-2.5"
+            className="border-emerald-500/30 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/15 text-xs h-8 gap-1.5 px-2.5"
           >
             <Download className="h-3.5 w-3.5" />
             <span>Install</span>
-          </Button>
-
-          <Button 
-            variant="outline" 
-            size="icon" 
-            className="border-primary/20 text-white hover:bg-primary/10 hover:text-primary transition-all duration-300 h-8 w-8" 
-            onClick={() => setIsOpen(!isOpen)}
-          >
-            {isOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </Button>
         </div>
       </header>
@@ -288,24 +315,23 @@ function AppContent() {
         isOpen={isInstallModalOpen} 
         onClose={() => setIsInstallModalOpen(false)} 
       />
+
+      <Toaster position="top-right" theme={theme} richColors />
     </div>
   );
 }
 
 export default function App() {
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
-  }, []);
-
   return (
-    <StorageProvider>
-      <TooltipProvider>
-        <Router>
-          <AppContent />
-          <Toaster position="top-right" theme="dark" richColors />
-        </Router>
-      </TooltipProvider>
-    </StorageProvider>
+    <ThemeProvider>
+      <StorageProvider>
+        <TooltipProvider>
+          <Router>
+            <AppContent />
+          </Router>
+        </TooltipProvider>
+      </StorageProvider>
+    </ThemeProvider>
   );
 }
 

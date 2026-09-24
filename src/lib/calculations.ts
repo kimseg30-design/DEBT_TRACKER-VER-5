@@ -159,10 +159,25 @@ export function getDeclaredMonths(
     }
   }
 
-  const elapsedDays = differenceInDays(endDate, startDate);
-  // "every 4 week which is equivalent to 1 month, the interest for that month must already declare"
-  // Day 0 to 27 is month 1. Day 28 to 55 is month 2.
-  return Math.max(1, Math.floor(elapsedDays / 28) + 1);
+  // For weekly/biweekly loans, 4 weeks = 28 days is 1 month cycle.
+  // Day 0 to 28 (up to Week 4) applies Month 1 interest.
+  // When it strictly exceeds Week 4 (Day 29 onwards), Month 2 interest applies automatically.
+  // If unpaid ('kung di pa nabayaran'), interest continues to accrue for each subsequent cycle.
+  if (loan.frequency === 'Monthly') {
+    let months = 1;
+    let nextCycleDate = getPhilippineMidnightDate(addMonths(startDate, 1));
+    while (endDate.getTime() > nextCycleDate.getTime()) {
+      months += 1;
+      nextCycleDate = getPhilippineMidnightDate(addMonths(startDate, months));
+    }
+    return Math.max(1, months);
+  } else {
+    const elapsedDays = differenceInDays(endDate, startDate);
+    // At Day 0 to 28 (Week 1 through Week 4): exactly 1 month.
+    // At Day 29 to 56 (Week 5 through Week 8): 2 months.
+    // At Day 57+ (Week 9+, if unpaid): 3 months, and so forth.
+    return Math.max(1, Math.floor(Math.max(0, elapsedDays - 1) / 28) + 1);
+  }
 }
 
 export function calculateCurrentDeclaredDetails(

@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStorage } from '../lib/storage';
+import { useTheme } from '../lib/theme';
+import { cn } from '../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
@@ -25,7 +27,9 @@ import {
   Sparkles,
   Eye,
   FileText,
-  Wallet
+  Wallet,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import InstallAppModal from './InstallAppModal';
@@ -46,6 +50,8 @@ export default function Settings() {
     updateAppSettings,
     resetAppSettings
   } = useStorage();
+
+  const { theme, setTheme, toggleTheme } = useTheme();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
@@ -137,8 +143,187 @@ export default function Settings() {
     <div className="space-y-8 animate-in fade-in duration-500 pb-12">
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-white neon-text">Settings & Customization</h2>
-        <p className="text-zinc-400">Palitan ang pangalan ng App, negosyo, loan officer, at i-manage ang cloud storage at backups.</p>
+        <p className="text-zinc-400">Palitan ang tema (Dark / Light Theme), pangalan ng App, negosyo, loan officer, at i-manage ang cloud storage at backups.</p>
       </div>
+
+      {/* Theme & Display Appearance Card */}
+      <Card className="bg-card border-primary/30 shadow-[0_0_25px_rgba(var(--primary),0.08)]">
+        <CardHeader className="pb-4 border-b border-primary/10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "p-2.5 rounded-xl border transition-all duration-200",
+                theme === 'dark' 
+                  ? "bg-primary/20 border-primary/40 text-primary shadow-[0_0_15px_rgba(var(--primary),0.3)]" 
+                  : "bg-amber-500/20 border-amber-500/40 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+              )}>
+                {theme === 'dark' ? <Moon className="h-6 w-6" /> : <Sun className="h-6 w-6" />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-white text-xl">App Theme (Tema ng App)</CardTitle>
+                  <Badge variant="outline" className={cn(
+                    "text-[10px] uppercase font-bold",
+                    theme === 'dark'
+                      ? "bg-primary/15 border-primary/40 text-primary"
+                      : "bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                  )}>
+                    {theme === 'dark' ? 'Dark Theme Active' : 'Light Theme Active'}
+                  </Badge>
+                </div>
+                <CardDescription className="text-zinc-400 text-xs">
+                  Madaling magpalit sa pagitan ng Dark Theme (Cyberpunk FinTech) at Light Theme (Clean Minimalist).
+                </CardDescription>
+              </div>
+            </div>
+
+            {/* Quick Interactive Toggle Switch */}
+            <div className="flex items-center gap-3 bg-background/80 px-4 py-2.5 rounded-xl border border-primary/20 shadow-sm shrink-0 self-start sm:self-auto">
+              <button 
+                type="button" 
+                onClick={() => setTheme('light')}
+                className={cn(
+                  "flex items-center gap-1.5 text-xs font-semibold transition-colors",
+                  theme === 'light' ? "text-amber-500 font-bold" : "text-zinc-400 hover:text-zinc-200"
+                )}
+              >
+                <Sun className="h-4 w-4" />
+                <span>Light</span>
+              </button>
+
+              <Switch 
+                checked={theme === 'dark'}
+                onCheckedChange={(checked) => {
+                  const newTheme = checked ? 'dark' : 'light';
+                  setTheme(newTheme);
+                  toast.success(`Switched to ${newTheme === 'dark' ? 'Dark' : 'Light'} Theme`);
+                }}
+                className="data-[state=checked]:bg-primary"
+              />
+
+              <button 
+                type="button" 
+                onClick={() => setTheme('dark')}
+                className={cn(
+                  "flex items-center gap-1.5 text-xs font-semibold transition-colors",
+                  theme === 'dark' ? "text-primary font-bold" : "text-zinc-400 hover:text-zinc-200"
+                )}
+              >
+                <Moon className="h-4 w-4" />
+                <span>Dark</span>
+              </button>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="pt-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Dark Theme Selection Card */}
+            <button
+              type="button"
+              onClick={() => {
+                setTheme('dark');
+                toast.success('Dark Theme activated');
+              }}
+              className={cn(
+                "p-4 rounded-xl border-2 text-left transition-all duration-200 flex flex-col gap-3 relative overflow-hidden group",
+                theme === 'dark'
+                  ? "border-primary bg-primary/10 shadow-[0_0_20px_rgba(var(--primary),0.2)]"
+                  : "border-zinc-800 hover:border-primary/40 bg-zinc-900/40 opacity-75 hover:opacity-100"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-black border border-zinc-700 text-primary group-hover:scale-105 transition-transform">
+                    <Moon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm text-white flex items-center gap-1.5">
+                      <span>Dark Theme</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">Neon Cyberpunk</span>
+                    </p>
+                    <p className="text-[11px] text-zinc-400">Madilim, cool sa mata, neon cyan/magenta styling</p>
+                  </div>
+                </div>
+                {theme === 'dark' ? (
+                  <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+                ) : (
+                  <div className="h-4 w-4 rounded-full border border-zinc-600 group-hover:border-primary shrink-0"></div>
+                )}
+              </div>
+
+              {/* Mini visual mockup */}
+              <div className="p-2.5 rounded-lg bg-black/80 border border-zinc-800 space-y-1.5 pointer-events-none">
+                <div className="flex items-center justify-between">
+                  <div className="h-2 w-16 bg-primary rounded-full"></div>
+                  <div className="h-2 w-6 bg-zinc-700 rounded-full"></div>
+                </div>
+                <div className="h-2 w-full bg-zinc-800 rounded-full"></div>
+                <div className="flex gap-1.5">
+                  <div className="h-3.5 w-12 bg-primary/20 border border-primary/40 rounded flex items-center justify-center">
+                    <div className="h-1 w-6 bg-primary rounded-full"></div>
+                  </div>
+                  <div className="h-3.5 w-12 bg-pink-500/20 border border-pink-500/40 rounded flex items-center justify-center">
+                    <div className="h-1 w-6 bg-pink-400 rounded-full"></div>
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            {/* Light Theme Selection Card */}
+            <button
+              type="button"
+              onClick={() => {
+                setTheme('light');
+                toast.success('Light Theme activated');
+              }}
+              className={cn(
+                "p-4 rounded-xl border-2 text-left transition-all duration-200 flex flex-col gap-3 relative overflow-hidden group",
+                theme === 'light'
+                  ? "border-primary bg-primary/10 shadow-[0_0_20px_rgba(var(--primary),0.15)]"
+                  : "border-zinc-800 hover:border-primary/40 bg-zinc-900/40 opacity-75 hover:opacity-100"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-white border border-slate-300 text-amber-500 shadow-sm group-hover:scale-105 transition-transform">
+                    <Sun className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm text-white flex items-center gap-1.5">
+                      <span>Light Theme</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">Minimal Clean</span>
+                    </p>
+                    <p className="text-[11px] text-zinc-400">Puti at malinis, mataas ang contrast sa daylight</p>
+                  </div>
+                </div>
+                {theme === 'light' ? (
+                  <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+                ) : (
+                  <div className="h-4 w-4 rounded-full border border-zinc-600 group-hover:border-primary shrink-0"></div>
+                )}
+              </div>
+
+              {/* Mini visual mockup */}
+              <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-200 shadow-sm space-y-1.5 pointer-events-none">
+                <div className="flex items-center justify-between">
+                  <div className="h-2 w-16 bg-teal-600 rounded-full"></div>
+                  <div className="h-2 w-6 bg-slate-300 rounded-full"></div>
+                </div>
+                <div className="h-2 w-full bg-slate-200 rounded-full"></div>
+                <div className="flex gap-1.5">
+                  <div className="h-3.5 w-12 bg-teal-100 border border-teal-300 rounded flex items-center justify-center">
+                    <div className="h-1 w-6 bg-teal-600 rounded-full"></div>
+                  </div>
+                  <div className="h-3.5 w-12 bg-pink-100 border border-pink-300 rounded flex items-center justify-center">
+                    <div className="h-1 w-6 bg-pink-600 rounded-full"></div>
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Editable App Name & Business Identity Section */}
       <Card className="bg-card border-primary/30 shadow-[0_0_30px_rgba(var(--primary),0.1)]">
